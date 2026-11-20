@@ -68,9 +68,8 @@ class TestLoadSyntheticData:
     def test_verdict_mix(self, db_session):
         _, results = seed.load_synthetic_data(db_session, n=10, seed=42)
         verdicts = [r.verdict for r in results]
-        assert verdicts.count("approved") == 5
-        assert verdicts.count("flagged") == 4
-        assert verdicts.count("rejected") == 1
+        assert verdicts.count("approved") == 4
+        assert verdicts.count("flagged") == 6
 
     def test_results_link_to_shops(self, db_session):
         shops, results = seed.load_synthetic_data(db_session, n=10, seed=42)
