@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Virtualenv
+.venv/
+venv/
+
+# Env
+.env
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated synthetic data (golden_expected.csv in tests/ is kept)
+data/synthetic/*.csv

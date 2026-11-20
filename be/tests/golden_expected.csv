@@ -1,0 +1,11 @@
+shop_id,shop_category,gstin_valid,verdict
+0,kirana_without_inventory,True,approved
+1,loose_goods,True,flagged
+2,packaged_fmcg,False,rejected
+3,branded_staples,True,approved
+4,beverages_impulse,True,flagged
+5,personal_care,True,approved
+6,general_merchandise,True,flagged
+7,packaged_fmcg,True,approved
+8,kirana_with_inventory,True,flagged
+9,loose_goods,True,approved

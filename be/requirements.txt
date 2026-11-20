@@ -1,0 +1,14 @@
+# UdyamCred Stage 1 backend dependencies
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+pytest
+pytest-cov
+python-dotenv
+pandas
+numpy
+pyyaml
+pyjwt
+python-multipart
+bcrypt
