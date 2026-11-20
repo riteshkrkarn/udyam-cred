@@ -4,6 +4,145 @@ Stages: **I** = Initial, **M** = MVP, **F** = Final. Every feature from the scop
 
 ---
 
+## Quick Start: Component Setup
+
+### 🧠 ML Component (Data Generation & Model Training)
+
+```bash
+cd ml
+
+# 1. Generate synthetic datasets
+python run_generator.py --gen all --with-features
+
+# 2. Train models (scorecard + capacity)
+python train_models.py
+
+# Models saved to: ml/models/
+```
+
+**Reference**: See [ML Model Training Guide](ml/MODEL_TRAINING.md)
+
+### 🔌 Backend Component (Python/FastAPI)
+
+```bash
+cd be
+
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Set environment
+export PYTHONPATH=.
+
+# 3. Run API server
+python -m api.main  # or uvicorn api.main:app --reload
+
+# API runs on: http://localhost:8000
+```
+
+**Endpoints**:
+- `POST /api/scoring/score` - Score a shop
+- `GET /api/health` - Health check
+- See [Backend Setup Guide](be/README.md)
+
+### 🎨 Frontend Component (React/Next.js)
+
+```bash
+cd fe
+
+# 1. Install dependencies
+npm install
+
+# 2. Set environment
+# Create .env.local with:
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+
+# 3. Run dev server
+npm run dev
+
+# Frontend runs on: http://localhost:3000
+```
+
+**Pages**:
+- `/` - Landing & login
+- `/apply` - Borrower application
+- `/dashboard` - Officer dashboard
+- See [Frontend Setup Guide](fe/README.md)
+
+---
+
+## Component Communication
+
+```
+┌─────────────────┐
+│    Frontend     │ (React/Next.js)
+│   :3000         │
+└────────┬────────┘
+         │ HTTP
+         ▼
+┌─────────────────┐
+│    Backend      │ (Python/FastAPI)
+│    :8000        │
+└────────┬────────┘
+         │ Load models
+         ▼
+┌─────────────────┐
+│  ML Models      │ (Trained models)
+│  Scorecard      │
+│  Capacity       │
+└─────────────────┘
+```
+
+### API Contract
+
+**Scoring Request** (Frontend → Backend)
+```json
+POST /api/scoring/score
+{
+  "shop_id": "shop_001",
+  "upi_inflow": 50000,
+  "gst_turnover": 80000,
+  "stock_value": 25000,
+  "family_size": 4,
+  "monthly_flows": [...],
+  "purchases": [...]
+}
+```
+
+**Scoring Response** (Backend → Frontend)
+```json
+{
+  "shop_id": "shop_001",
+  "default_probability": 0.08,
+  "risk_band": "Moderate",
+  "confidence": 0.85,
+  "safe_emi": 12500,
+  "reasons": ["stable cash flow", "good stock ratio"],
+  "loan_amount": 75000,
+  "rate_band": "A",
+  "emi_schedule": [...]
+}
+```
+
+### Environment Setup
+
+Create `.env` files in each component:
+
+**Backend** (`be/.env`)
+```
+DEBUG=True
+ML_MODELS_PATH=../ml/models
+DATABASE_URL=sqlite:///udyam.db
+CORS_ORIGINS=http://localhost:3000
+```
+
+**Frontend** (`.env.local`)
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+NEXT_PUBLIC_APP_NAME=UdyamCred
+```
+
+---
+
 ## Part 1: Stages
 
 ### Stage 1: Initial (foundation and core check)
@@ -211,3 +350,235 @@ If judges ask for an agentic design, present the two AI steps above as agent ste
 ## Part 5: Risk
 
 Final carries many features plus the evaluation work. If the team runs short, watch three places: Bill OCR, the fairness audit, and the capacity model's training data. Every claim in the doc depends on evaluation results, so keep the evaluation script in Final even if features are trimmed.
+
+
+---
+
+## Development Workflow
+
+### 1. Local Development Setup
+
+```bash
+# Clone and setup
+git clone <repo-url>
+cd udyam-cred
+
+# Create virtual environments for each component
+cd ml && python -m venv .venv && source .venv/bin/activate
+cd ../be && python -m venv .venv && source .venv/bin/activate
+cd ../fe && npm install
+```
+
+### 2. Start All Components
+
+Run in separate terminals:
+
+**Terminal 1: ML (Training)**
+```bash
+cd ml
+source .venv/bin/activate
+python train_models.py
+# Models trained and saved to ml/models/
+```
+
+**Terminal 2: Backend (API)**
+```bash
+cd be
+source .venv/bin/activate
+python -m uvicorn api.main:app --reload --port 8000
+```
+
+**Terminal 3: Frontend (UI)**
+```bash
+cd fe
+npm run dev  # Runs on http://localhost:3000
+```
+
+### 3. Test Component Integration
+
+```bash
+# Backend health check
+curl http://localhost:8000/health
+
+# Frontend loads
+open http://localhost:3000
+```
+
+### 4. File Organization
+
+```
+udyam-cred/
+├── ml/                          # ML pipeline
+│   ├── generator.py             # Data generation
+│   ├── feature_builder.py       # Feature engineering
+│   ├── train_models.py          # Model training script
+│   ├── MODEL_TRAINING.md        # Training guide
+│   ├── data/                    # Generated datasets
+│   │   ├── features_gen1.csv    # Training features
+│   │   └── labels_gen1.csv      # Training labels
+│   └── models/                  # Trained models
+│       ├── scorecard.pkl        # Logistic regression
+│       ├── capacity_model.pkl   # Capacity model
+│       └── config.json          # Model metadata
+│
+├── be/                          # Backend (Python/FastAPI)
+│   ├── api/
+│   │   ├── main.py              # Entry point
+│   │   ├── routes/
+│   │   │   ├── scoring.py       # Scoring endpoint
+│   │   │   └── applications.py  # Application APIs
+│   │   └── models/
+│   │       ├── scorecard.py     # Load ML models
+│   │       └── decision.py      # Decision logic
+│   ├── requirements.txt
+│   └── README.md                # Backend setup guide
+│
+├── fe/                          # Frontend (React/Next.js)
+│   ├── pages/
+│   │   ├── index.tsx            # Landing page
+│   │   ├── apply.tsx            # Application form
+│   │   └── dashboard.tsx        # Officer dashboard
+│   ├── components/
+│   │   ├── ScoringResult.tsx    # Display results
+│   │   └── ApplicationForm.tsx  # Form component
+│   ├── services/
+│   │   └── api.ts               # API calls
+│   ├── package.json
+│   └── README.md                # Frontend setup guide
+│
+└── README.md                    # This file (main guide)
+```
+
+### 5. Data Flow Example
+
+**Scoring Request Journey:**
+
+```
+User fills form (Frontend)
+         ↓
+POST /api/scoring/score (HTTP)
+         ↓
+Backend receives request
+         ↓
+Load ML models (pickle files)
+         ↓
+Preprocess features (StandardScaler)
+         ↓
+Scorecard predict_proba()
+         ↓
+Capacity model predict()
+         ↓
+Apply business rules
+         ↓
+Return JSON response
+         ↓
+Frontend displays results
+```
+
+### 6. Model Updates
+
+When you retrain models:
+
+```bash
+# 1. Train new models (overwrites ml/models/*)
+cd ml
+python train_models.py
+
+# 2. Backend automatically loads updated models (pickle)
+# No restart needed if using dynamic loading
+
+# 3. Test new predictions
+curl -X POST http://localhost:8000/api/scoring/score \
+  -H "Content-Type: application/json" \
+  -d @test_request.json
+```
+
+### 7. Common Development Tasks
+
+**Add a new feature to scorecard:**
+1. Update `feature_builder.py` to generate it
+2. Regenerate data: `python run_generator.py --gen all --with-features`
+3. Retrain models: `python train_models.py`
+4. Test: `curl http://localhost:8000/api/scoring/score`
+
+**Add a new API endpoint:**
+1. Add route in `be/api/routes/*.py`
+2. Import in `be/api/main.py`
+3. Test: `curl http://localhost:8000/api/new_endpoint`
+
+**Add a new page to frontend:**
+1. Create `fe/pages/new_page.tsx`
+2. Add link in navigation component
+3. Call backend API: `await api.get('/api/...')`
+
+### 8. Debugging
+
+**Backend logs:**
+```bash
+# Uvicorn logs are printed to terminal
+# Add debug logging in routes:
+import logging
+logger = logging.getLogger(__name__)
+logger.debug(f"Scoring shop: {shop_id}")
+```
+
+**Frontend logs:**
+```bash
+# Check browser console (F12)
+# Check terminal running `npm run dev`
+```
+
+**ML model issues:**
+```bash
+# Test model loading
+python -c "import pickle; m = pickle.load(open('ml/models/scorecard.pkl', 'rb')); print(m)"
+```
+
+---
+
+## Deployment
+
+### Staging
+
+```bash
+# Deploy all components to staging environment
+git push origin main
+# CI/CD pipeline runs tests and deploys to staging.udyam-cred.example.com
+```
+
+### Production
+
+```bash
+# After testing on staging
+git tag v1.0.0
+git push origin v1.0.0
+# CI/CD pipeline deploys to production
+```
+
+### Environment Variables
+
+**Production .env files:**
+
+`be/.env.prod`
+```
+DEBUG=False
+ML_MODELS_PATH=/app/ml/models
+DATABASE_URL=postgresql://user:pass@db:5432/udyam
+CORS_ORIGINS=https://udyam-cred.example.com
+```
+
+`fe/.env.production`
+```
+NEXT_PUBLIC_API_URL=https://api.udyam-cred.example.com
+NEXT_PUBLIC_APP_NAME=UdyamCred
+```
+
+---
+
+## Support & Documentation
+
+- **ML**: See [ml/MODEL_TRAINING.md](ml/MODEL_TRAINING.md) for model training details
+- **ML Data**: See [ml/README.md](ml/README.md) for dataset structure
+- **Backend**: See [be/README.md](be/README.md) for API documentation
+- **Frontend**: See [fe/README.md](fe/README.md) for UI component guide
+- **This file**: High-level project overview and integration guide
