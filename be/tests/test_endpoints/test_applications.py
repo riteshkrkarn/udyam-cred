@@ -227,3 +227,112 @@ class TestApplicationCascadeDelete:
             db_session.query(HouseholdData).filter_by(application_id=app_id).first()
             is None
         )
+
+
+class TestApplicationMultiple:
+    """Tests for multiple applications per borrower."""
+
+    def test_borrower_multiple_applications(self, db_session: Session, test_user, test_shop):
+        """Test that borrower can have multiple applications."""
+        app1 = Application(
+            borrower_id=test_user.id,
+            shop_id=test_shop.id,
+            loan_amount_requested=50000.0,
+            purpose="Inventory",
+            status="pending",
+        )
+        app2 = Application(
+            borrower_id=test_user.id,
+            shop_id=test_shop.id,
+            loan_amount_requested=100000.0,
+            purpose="Expansion",
+            status="approved",
+        )
+        db_session.add_all([app1, app2])
+        db_session.commit()
+
+        apps = db_session.query(Application).filter_by(borrower_id=test_user.id).all()
+        assert len(apps) == 2
+
+    def test_shop_multiple_applications(self, db_session: Session, test_user, test_shop):
+        """Test that shop can have multiple applications from different borrowers."""
+        from app.models import User as UserModel
+        
+        user2 = UserModel(
+            email="borrower2@test.com",
+            password_hash="hash",
+            role="borrower",
+        )
+        db_session.add(user2)
+        db_session.commit()
+
+        app1 = Application(
+            borrower_id=test_user.id,
+            shop_id=test_shop.id,
+            loan_amount_requested=50000.0,
+            purpose="Inventory",
+        )
+        app2 = Application(
+            borrower_id=user2.id,
+            shop_id=test_shop.id,
+            loan_amount_requested=75000.0,
+            purpose="Expansion",
+        )
+        db_session.add_all([app1, app2])
+        db_session.commit()
+
+        shop_apps = db_session.query(Application).filter_by(
+            shop_id=test_shop.id
+        ).all()
+        assert len(shop_apps) == 2
+
+
+class TestApplicationValidation:
+    """Tests for application-level validation."""
+
+    def test_application_loan_amount_precision(self, db_session: Session, test_user, test_shop):
+        """Test that loan_amount_requested handles decimal values."""
+        app = Application(
+            borrower_id=test_user.id,
+            shop_id=test_shop.id,
+            loan_amount_requested=50000.99,
+            purpose="Test",
+        )
+        db_session.add(app)
+        db_session.commit()
+        db_session.refresh(app)
+
+        assert app.loan_amount_requested == 50000.99
+
+    def test_application_status_transitions(self, db_session: Session, test_user, test_shop):
+        """Test valid application status transitions."""
+        app = Application(
+            borrower_id=test_user.id,
+            shop_id=test_shop.id,
+            loan_amount_requested=50000.0,
+            status="pending",
+        )
+        db_session.add(app)
+        db_session.commit()
+
+        # Transition statuses
+        statuses = ["pending", "submitted", "under_review", "approved"]
+        for status in statuses:
+            app.status = status
+            db_session.commit()
+            db_session.refresh(app)
+            assert app.status == status
+
+    def test_large_loan_amount(self, db_session: Session, test_user, test_shop):
+        """Test application with large loan amount."""
+        app = Application(
+            borrower_id=test_user.id,
+            shop_id=test_shop.id,
+            loan_amount_requested=5000000.0,  # 50 lakhs
+            purpose="Major expansion",
+        )
+        db_session.add(app)
+        db_session.commit()
+
+        retrieved = db_session.query(Application).filter_by(id=app.id).first()
+        assert retrieved.loan_amount_requested == 5000000.0

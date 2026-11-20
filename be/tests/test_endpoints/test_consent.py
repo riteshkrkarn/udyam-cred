@@ -96,8 +96,122 @@ class TestConsentCreate:
         # In practice, the endpoint would validate application exists first
 
 
+class TestConsentRetrieve:
+    """Tests for GET /api/applications/{id}/consent."""
+
+    def test_get_consent(self, db_session: Session, test_application):
+        """Test retrieving consent record."""
+        consent = Consent(
+            application_id=test_application.id,
+            text="I agree to share my financial data",
+            borrower_agreed=True,
+            agreed_at=utcnow_naive(),
+        )
+        db_session.add(consent)
+        db_session.commit()
+
+        retrieved = db_session.query(Consent).filter_by(
+            application_id=test_application.id
+        ).first()
+        assert retrieved is not None
+        assert retrieved.text == "I agree to share my financial data"
+
+    def test_get_consent_not_found(self, db_session: Session):
+        """Test retrieving consent for non-existent application."""
+        result = db_session.query(Consent).filter_by(
+            application_id=9999
+        ).first()
+        assert result is None
+
+
+class TestConsentMultiple:
+    """Tests for multiple consents per application."""
+
+    def test_multiple_consents_same_app(self, db_session: Session, test_application):
+        """Test creating multiple consent records for same application."""
+        consent1 = Consent(
+            application_id=test_application.id,
+            text="Data sharing consent",
+            borrower_agreed=True,
+        )
+        consent2 = Consent(
+            application_id=test_application.id,
+            text="Credit check consent",
+            borrower_agreed=True,
+        )
+        db_session.add_all([consent1, consent2])
+        db_session.commit()
+
+        consents = db_session.query(Consent).filter_by(
+            application_id=test_application.id
+        ).all()
+        assert len(consents) == 2
+
+    def test_consent_cascade_delete(self, db_session: Session, test_user, test_shop):
+        """Test that consent is deleted when application is deleted."""
+        app = Application(
+            borrower_id=test_user.id,
+            shop_id=test_shop.id,
+            loan_amount_requested=50000,
+        )
+        db_session.add(app)
+        db_session.commit()
+
+        consent = Consent(
+            application_id=app.id,
+            text="Test consent",
+            borrower_agreed=True,
+        )
+        db_session.add(consent)
+        db_session.commit()
+
+        app_id = app.id
+        consent_id = consent.id
+
+        # Delete application
+        db_session.delete(app)
+        db_session.commit()
+
+        # Verify consent is also deleted
+        assert db_session.query(Consent).filter_by(id=consent_id).first() is None
+
+
 class TestConsentWithdraw:
     """Tests for DELETE /api/applications/{id}/consent."""
+
+    def test_withdraw_consent(self, db_session: Session, test_application):
+        """Test withdrawing consent."""
+        consent = Consent(
+            application_id=test_application.id,
+            text="I agree to share my financial data",
+            borrower_agreed=True,
+            agreed_at=utcnow_naive(),
+        )
+        db_session.add(consent)
+        db_session.commit()
+
+        # Withdraw
+        consent.withdrawn_at = utcnow_naive()
+        db_session.commit()
+        db_session.refresh(consent)
+
+        assert consent.withdrawn_at is not None
+
+    def test_withdraw_already_declined_consent(self, db_session: Session, test_application):
+        """Test withdrawing consent that was never agreed."""
+        consent = Consent(
+            application_id=test_application.id,
+            text="I agree...",
+            borrower_agreed=False,
+        )
+        db_session.add(consent)
+        db_session.commit()
+
+        # Try to withdraw
+        consent.withdrawn_at = utcnow_naive()
+        db_session.commit()
+
+        assert consent.withdrawn_at is not None
 
     def test_withdraw_consent(self, db_session: Session, test_application):
         """Test withdrawing consent."""

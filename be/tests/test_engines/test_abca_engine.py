@@ -108,3 +108,78 @@ class TestAbcaEngine:
 
         # Only positive amounts count: 10000 * 6 = 60000, average = 5000
         assert result["upi_avg"] == 5000.0
+
+    def test_high_variance_low_confidence(self):
+        """Test that high variance between UPI and AA yields low confidence."""
+        upi_data = {
+            "data": [{"amount": 5000} for _ in range(12)],
+            "vintage_date": "2023-01-01",
+        }
+        aa_data = {
+            "data": [{"deposits": 50000} for _ in range(12)],
+            "vintage_date": "2023-01-01",
+        }
+
+        result = calculate_abca(upi_data, aa_data)
+
+        # Large difference (10x), should have low confidence
+        # Confidence is 0.7 when they differ > 20%
+        assert result["confidence"] <= 0.7
+
+    def test_large_data_sample(self):
+        """Test ABCA with larger monthly data."""
+        upi_data = {
+            "data": [{"amount": 100000 + i * 1000} for i in range(12)],
+            "vintage_date": "2023-01-01",
+        }
+        aa_data = {
+            "data": [{"deposits": 105000 + i * 1000} for i in range(12)],
+            "vintage_date": "2023-01-01",
+        }
+
+        result = calculate_abca(upi_data, aa_data)
+
+        assert result["abca_value"] > 0
+        assert result["confidence"] > 0
+
+    def test_vintage_date_tracking(self):
+        """Test that vintage dates are properly tracked."""
+        upi_data = {
+            "data": [{"amount": 10000} for _ in range(12)],
+            "vintage_date": "2023-03-15",
+        }
+        aa_data = {
+            "data": [{"deposits": 10000} for _ in range(12)],
+            "vintage_date": "2023-02-01",
+        }
+
+        result = calculate_abca(upi_data, aa_data)
+
+        assert result["vintage_dates"]["upi_vintage"] == "2023-03-15"
+        assert result["vintage_dates"]["aa_vintage"] == "2023-02-01"
+
+    def test_very_small_amounts(self):
+        """Test ABCA with very small amounts (< 100)."""
+        upi_data = {
+            "data": [{"amount": 50} for _ in range(12)],
+            "vintage_date": "2023-01-01",
+        }
+
+        result = calculate_abca(upi_data, None)
+
+        assert result["abca_value"] == 50.0
+
+    def test_mixed_positive_zero_amounts(self):
+        """Test ABCA with mixed positive and zero amounts."""
+        # The engine averages over all 12 months, including zeros
+        # So (10000 + 0 + 10000 + 0*9) / 12 = 20000/12 = 1666.67
+        upi_data = {
+            "data": [{"amount": 10000}, {"amount": 0}, {"amount": 10000}] + 
+                    [{"amount": 0} for _ in range(9)],
+            "vintage_date": "2023-01-01",
+        }
+
+        result = calculate_abca(upi_data, None)
+
+        # Average over all 12 entries: (10000 + 0 + 10000 + 0*9) / 12
+        assert result["upi_avg"] == pytest.approx(1666.67, rel=0.01)
