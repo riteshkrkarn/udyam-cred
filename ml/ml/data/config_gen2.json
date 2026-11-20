@@ -1,0 +1,23 @@
+{
+  "generator_id": 2,
+  "seed": 123,
+  "n_shops": 1500,
+  "months_per_shop": 30,
+  "health_mean": 0.55,
+  "health_std": 0.28,
+  "seasonality_amplitude": 0.3,
+  "seasonality_peak_months": [
+    10,
+    11,
+    12,
+    1
+  ],
+  "default_rate_base": 0.12,
+  "default_volatility_weight": 0.35,
+  "default_trend_weight": 0.25,
+  "roundtrip_rate": 0.04,
+  "sales_inflation_rate": 0.06,
+  "vintage_disagreement_rate": 0.15,
+  "supplier_mismatch_rate": 0.04,
+  "keep_thin_history_rate": 0.18
+}

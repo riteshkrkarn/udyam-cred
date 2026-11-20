@@ -1,0 +1,6 @@
+# ML dependencies for UdyamCred data generation and feature engineering
+# Using flexible versions to allow pre-built wheels on Windows
+
+pandas
+numpy
+python-dotenv
