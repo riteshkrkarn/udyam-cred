@@ -3,16 +3,20 @@
 Inputs (a "shop" - a dict from the synthetic generator, or an ORM Shop object):
   - gstin:           GSTIN string (validated for format + checksum)
   - shop_category:   one of the 8 leaf categories in the policy
-  - purchases:       cost of goods sold (the goods the shop bought to sell on)
+  - opening_stock:   opening inventory value (defaults to 0 if not provided)
+  - purchases:       cost of goods purchased
+  - closing_stock:   closing inventory value (defaults to 0 if not provided)
   - gst_turnover:     sales the shop declared on its GST return
   - upi_turnover:     digital (UPI) payment receipts
 
 Logic:
-  The spec's inverse formula (margin on selling price) is:
-      expected_sales = goods_sold / (1 + margin)
+  Goods sold (COGS) = opening_stock + purchases - closing_stock.
+  
+  The correct formula for margin on selling price is:
+      expected_sales = goods_sold / (1 - margin)
   For a category range [margin_low, margin_high] the expected sales band is:
-      expected_sales_high = goods_sold / (1 + margin_low)   (lower margin -> higher sales)
-      expected_sales_low  = goods_sold / (1 + margin_high)  (higher margin -> lower sales)
+      expected_sales_high = goods_sold / (1 - margin_low)   (lower margin -> higher sales)
+      expected_sales_low  = goods_sold / (1 - margin_high)  (higher margin -> lower sales)
   A tolerance band (policy.tolerance) is applied on both ends before comparison.
 
 Verdicts:
@@ -46,14 +50,19 @@ def reconcile(shop: Any, policy: Policy) -> dict:
     m_low, m_high = cat.margin_low, cat.margin_high
     tol = policy.tolerance
 
-    goods_sold = float(_get(shop, "purchases", 0.0))
+    # Goods sold = opening_stock + purchases - closing_stock
+    opening_stock = float(_get(shop, "opening_stock", 0.0))
+    purchases = float(_get(shop, "purchases", 0.0))
+    closing_stock = float(_get(shop, "closing_stock", 0.0))
+    goods_sold = opening_stock + purchases - closing_stock
+
     gst_turnover = float(_get(shop, "gst_turnover", 0.0))
     upi_turnover = float(_get(shop, "upi_turnover", 0.0))
 
-    # Inverse formula: expected_sales = goods_sold / (1 + margin).
-    # higher margin -> smaller expected sales, so low uses margin_high and vice versa.
-    expected_sales_low = goods_sold / (1.0 + m_high)
-    expected_sales_high = goods_sold / (1.0 + m_low)
+    # Margin on selling price: expected_sales = goods_sold / (1 - margin).
+    # lower margin -> lower expected sales, so low uses margin_low and vice versa.
+    expected_sales_low = goods_sold / (1.0 - m_low)
+    expected_sales_high = goods_sold / (1.0 - m_high)
 
     band_low = expected_sales_low * (1.0 - tol)
     band_high = expected_sales_high * (1.0 + tol)

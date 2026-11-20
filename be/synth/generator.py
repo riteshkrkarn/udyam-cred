@@ -94,26 +94,26 @@ class SyntheticDataGenerator:
 
         if kind == "approved":
             # Declared sales sit at the expected band midpoint -> approved.
-            expected = goods / (1.0 + m_mid)
+            expected = goods / (1.0 - m_mid)
             gst = round(expected, 2)
             upi = round(gst * 0.5, 2)
         elif kind == "suppression":
             # Declared sales well below the band (and above UPI) -> flagged.
-            expected_low = goods / (1.0 + m_high)
+            expected_low = goods / (1.0 - m_high)
             gst = round(expected_low * 0.7, 2)
             upi = round(gst * 0.6, 2)
         elif kind == "upi_exceeds_gst":
             # Digital receipts exceed declared sales -> flagged.
-            expected = goods / (1.0 + m_mid)
+            expected = goods / (1.0 - m_mid)
             gst = round(expected, 2)
             upi = round(gst * 1.6, 2)
         elif kind == "invalid_gstin":
             # Numbers would approve, but the GSTIN is invalid -> rejected.
-            expected = goods / (1.0 + m_mid)
+            expected = goods / (1.0 - m_mid)
             gst = round(expected, 2)
             upi = round(gst * 0.5, 2)
         else:
-            expected = goods / (1.0 + m_mid)
+            expected = goods / (1.0 - m_mid)
             gst = round(expected, 2)
             upi = round(gst * 0.5, 2)
 
