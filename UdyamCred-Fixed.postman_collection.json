@@ -1,0 +1,375 @@
+{
+  "info": {
+    "_postman_id": "udyam-cred-collection-fixed",
+    "name": "UdyamCred API - Fixed",
+    "description": "UdyamCred Backend API with auto token management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Register New User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"merchant@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"role\": \"borrower\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login (AUTO TOKEN SAVE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    try {",
+                  "        var jsonData = pm.response.json();",
+                  "        console.log('Login Response:', jsonData);",
+                  "        pm.environment.set('token', jsonData.access_token);",
+                  "        pm.environment.set('refresh_token', jsonData.refresh_token);",
+                  "        console.log('Token saved:', pm.environment.get('token').substring(0, 20) + '...');",
+                  "    } catch(e) {",
+                  "        console.error('Error parsing response:', e);",
+                  "    }",
+                  "} else {",
+                  "    console.error('Login failed with code:', pm.response.code);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"merchant@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"remember_me\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token (Updates Access Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('token', jsonData.access_token);",
+                  "    pm.environment.set('refresh_token', jsonData.refresh_token);",
+                  "    console.log('Token refreshed successfully');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Get Current User (Test Auth)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/shops/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "shops",
+                "me"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reconciliation",
+      "item": [
+        {
+          "name": "Reconcile - Approved Shop",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shop_id\": \"shop_approved_1\",\n  \"gstin\": \"29AABCR0102R1Z5\",\n  \"shop_category\": \"pharmacy\",\n  \"purchases\": 200000,\n  \"gst_turnover\": 250000,\n  \"upi_turnover\": 150000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reconcile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconcile"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reconcile - Sales Suppression (Flagged)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shop_id\": \"shop_flagged_1\",\n  \"gstin\": \"29AABCR0102R1Z5\",\n  \"shop_category\": \"general_store\",\n  \"purchases\": 500000,\n  \"gst_turnover\": 350000,\n  \"upi_turnover\": 200000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reconcile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconcile"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reconcile - UPI Anomaly (Flagged)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shop_id\": \"shop_flagged_2\",\n  \"gstin\": \"29AABCR0102R1Z5\",\n  \"shop_category\": \"electronics\",\n  \"purchases\": 1000000,\n  \"gst_turnover\": 1100000,\n  \"upi_turnover\": 1500000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reconcile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconcile"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reconcile - Sales Inflation (Flagged)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shop_id\": \"shop_flagged_3\",\n  \"gstin\": \"29AABCR0102R1Z5\",\n  \"shop_category\": \"apparel\",\n  \"purchases\": 300000,\n  \"gst_turnover\": 600000,\n  \"upi_turnover\": 200000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reconcile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconcile"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reconcile - Invalid GSTIN (Rejected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shop_id\": \"shop_rejected_1\",\n  \"gstin\": \"INVALID123\",\n  \"shop_category\": \"hardware\",\n  \"purchases\": 300000,\n  \"gst_turnover\": 400000,\n  \"upi_turnover\": 250000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reconcile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reconcile"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://assets.requestly.com/local/v1.20.0/metadata.json",
+  "type": "api",
+  "entryType": "http",
+  "id": "87509428-e2ad-4764-b9ea-4185b7470bdd",
+  "rank": "a4",
+  "url": "{{base_url}}/reconcile",
+  "method": "POST",
+  "contentType": "json"
+}

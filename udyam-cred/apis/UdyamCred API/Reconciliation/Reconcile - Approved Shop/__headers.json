@@ -1,0 +1,14 @@
+[
+  {
+    "id": 0,
+    "key": "Authorization",
+    "value": "Bearer {{token}}",
+    "isEnabled": true
+  },
+  {
+    "id": 1,
+    "key": "Content-Type",
+    "value": "application/json",
+    "isEnabled": true
+  }
+]
