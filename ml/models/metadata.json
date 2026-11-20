@@ -1,0 +1,95 @@
+{
+  "version": "1.0",
+  "created_at": "2026-11-21T02:12:58.850899",
+  "features": [
+    "n_months_data",
+    "total_upi_inflow",
+    "avg_upi_inflow",
+    "std_upi_inflow",
+    "total_cash_deposits",
+    "avg_cash_deposits",
+    "avg_cash_withdrawal_rate",
+    "latest_month_end_balance",
+    "balance_trend",
+    "total_gst_turnover",
+    "n_gst_filed",
+    "gst_filing_rate",
+    "reconciliation_gap_mean",
+    "reconciliation_gap_std",
+    "sales_gst_correlation",
+    "avg_stock_value",
+    "avg_fast_moving_share",
+    "avg_turnover_days",
+    "n_purchase_bills",
+    "n_suppliers",
+    "supplier_confirmation_rate",
+    "n_vintage_sources",
+    "vintage_disagreement_days",
+    "months_since_first_signal",
+    "n_transfers",
+    "n_round_trip_transfers",
+    "round_trip_transfer_rate",
+    "shop_type_apparel",
+    "shop_size_micro",
+    "rented_or_owned_rented",
+    "family_size",
+    "shop_vintage_months",
+    "has_co_borrower",
+    "co_borrower_score",
+    "shop_type_hardware",
+    "shop_type_electronics",
+    "shop_size_medium",
+    "shop_size_small",
+    "shop_type_pharmacy",
+    "shop_type_general_store"
+  ],
+  "metrics": {
+    "scorecard": {
+      "train_auc": 0.6162974338344769,
+      "train_default_rate": 0.08371428571428571,
+      "train_samples": 3500,
+      "val_auc": 0.5311558568137515,
+      "val_default_rate": 0.088,
+      "val_samples": 1500
+    },
+    "capacity_model": {
+      "train_mae": 664.390677081511,
+      "train_rmse": 1452.3258720412061,
+      "train_r2": 0.820029856777605,
+      "train_mean_emi": 12928.18544041553,
+      "train_std_emi": 3423.448845903717,
+      "train_samples": 3500,
+      "val_mae": 708.8383089043515,
+      "val_rmse": 1560.1045938571021,
+      "val_r2": 0.7898836809692448,
+      "val_mean_emi": 12832.791526138097,
+      "val_std_emi": 3403.4848652968894,
+      "val_samples": 1500
+    },
+    "test": {
+      "test_auc_scorecard": 0.6102065477376919,
+      "test_default_rate": 0.07733333333333334,
+      "test_mae_capacity": 702.8739265664987,
+      "test_rmse_capacity": 1555.738576401276,
+      "test_r2_capacity": 0.8301572738380046,
+      "test_mean_emi": 12147.952904846301
+    }
+  },
+  "scorecard_info": {
+    "type": "LogisticRegression",
+    "classes": [
+      0,
+      1
+    ],
+    "coefficients_shape": [
+      1,
+      40
+    ]
+  },
+  "capacity_model_info": {
+    "type": "LinearRegression",
+    "coefficients_shape": [
+      40
+    ]
+  }
+}
