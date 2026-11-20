@@ -1,10 +1,20 @@
-"""SQLAlchemy ORM models for UdyamCred Stage 1.
+"""SQLAlchemy ORM models for UdyamCred.
 
-Tables:
+Stage 1 Tables:
   - users: login accounts with a role (borrower, officer, approver, auditor).
   - shops: synthetic shop records (turnover, purchases, GSTIN, category).
   - reconciliation_results: verdict + reconciliation detail per shop.
   - refresh_tokens: hashed, rotating refresh tokens (DB-stored).
+
+Stage 2 Tables:
+  - applications: borrower loan applications
+  - consent: borrower consent records
+  - documents: uploaded documents (bills, purchase orders, etc.)
+  - household_data: family budget and liabilities
+  - decisions: scoring decisions with loan amount, rate, EMI
+  - overrides: officer overrides of decisions
+  - audit_logs: audit trail for all entities
+  - data_sources: raw data from external adapters (UPI, AA, GST)
 """
 from __future__ import annotations
 
@@ -36,6 +46,12 @@ class User(Base):
     refresh_tokens = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )
+    applications = relationship(
+        "Application", back_populates="borrower", cascade="all, delete-orphan"
+    )
+    overrides = relationship(
+        "Override", back_populates="officer", cascade="all, delete-orphan"
+    )
 
 
 class Shop(Base):
@@ -57,6 +73,9 @@ class Shop(Base):
 
     reconciliation_results = relationship(
         "ReconciliationResult", back_populates="shop", cascade="all, delete-orphan"
+    )
+    applications = relationship(
+        "Application", back_populates="shop", cascade="all, delete-orphan"
     )
 
 
@@ -94,3 +113,165 @@ class RefreshToken(Base):
     created_at = Column(DateTime, default=utcnow_naive, nullable=False)
 
     user = relationship("User", back_populates="refresh_tokens")
+
+
+# ============================================================================
+# Stage 2: Application Workflow Tables
+# ============================================================================
+
+
+class Application(Base):
+    __tablename__ = "applications"
+
+    id = Column(Integer, primary_key=True)
+    borrower_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    shop_id = Column(Integer, ForeignKey("shops.id"), nullable=False, index=True)
+    loan_amount_requested = Column(Float, nullable=False)
+    purpose = Column(String(255), nullable=True)
+    status = Column(
+        String(32), nullable=False, default="pending"
+    )  # pending | submitted | under_review | approved | rejected
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    borrower = relationship("User", back_populates="applications")
+    shop = relationship("Shop", back_populates="applications")
+    consents = relationship(
+        "Consent", back_populates="application", cascade="all, delete-orphan"
+    )
+    documents = relationship(
+        "Document", back_populates="application", cascade="all, delete-orphan"
+    )
+    household_data = relationship(
+        "HouseholdData", back_populates="application", cascade="all, delete-orphan"
+    )
+    decisions = relationship(
+        "Decision", back_populates="application", cascade="all, delete-orphan"
+    )
+    data_sources = relationship(
+        "DataSource", back_populates="application", cascade="all, delete-orphan"
+    )
+
+
+class Consent(Base):
+    __tablename__ = "consents"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True
+    )
+    text = Column(Text, nullable=False)
+    borrower_agreed = Column(Boolean, nullable=False, default=False)
+    agreed_at = Column(DateTime, nullable=True)
+    withdrawn_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="consents")
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True
+    )
+    document_type = Column(
+        String(32), nullable=False
+    )  # bill | purchase | ledger | statement | other
+    file_path = Column(String(512), nullable=False)
+    uploaded_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="documents")
+
+
+class HouseholdData(Base):
+    __tablename__ = "household_data"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True, unique=True
+    )
+    family_size = Column(Integer, nullable=False)
+    dependents = Column(Integer, nullable=False, default=0)
+    monthly_expenses = Column(Float, nullable=False)
+    assets = Column(Float, nullable=False, default=0.0)
+    liabilities = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="household_data")
+
+
+class Decision(Base):
+    __tablename__ = "decisions"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True
+    )
+    verdict = Column(String(32), nullable=False)  # approved | rejected
+    loan_amount = Column(Float, nullable=False)
+    rate_percent = Column(Float, nullable=True)
+    emi_monthly = Column(Float, nullable=True)
+    confidence = Column(Float, nullable=False, default=0.0)
+    reasons_json = Column(Text, nullable=True)  # JSON-serialized list of reason codes
+    replay_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="decisions")
+    overrides = relationship(
+        "Override", back_populates="decision", cascade="all, delete-orphan"
+    )
+    audit_logs = relationship(
+        "AuditLog", 
+        foreign_keys="AuditLog.entity_id",
+        primaryjoin="and_(AuditLog.entity_type=='decision', AuditLog.entity_id==Decision.id)",
+        cascade="all, delete-orphan",
+        viewonly=True
+    )
+
+
+class Override(Base):
+    __tablename__ = "overrides"
+
+    id = Column(Integer, primary_key=True)
+    decision_id = Column(
+        Integer, ForeignKey("decisions.id"), nullable=False, index=True
+    )
+    officer_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    old_loan_amount = Column(Float, nullable=False)
+    new_loan_amount = Column(Float, nullable=False)
+    reason = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    decision = relationship("Decision", back_populates="overrides")
+    officer = relationship("User", back_populates="overrides")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True)
+    entity_type = Column(
+        String(32), nullable=False
+    )  # application | decision | override
+    entity_id = Column(Integer, nullable=False, index=True)
+    action = Column(String(32), nullable=False)  # created | updated | overridden
+    officer_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    details_json = Column(Text, nullable=True)  # JSON for additional context
+    timestamp = Column(DateTime, default=utcnow_naive, nullable=False)
+
+
+class DataSource(Base):
+    __tablename__ = "data_sources"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True
+    )
+    source = Column(String(32), nullable=False)  # upi | aa | gst
+    vintage_date = Column(DateTime, nullable=False)
+    data_hash = Column(String(64), nullable=True)  # SHA256 hash of data_json
+    data_json = Column(Text, nullable=False)  # JSON-serialized data
+    fetched_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="data_sources")
