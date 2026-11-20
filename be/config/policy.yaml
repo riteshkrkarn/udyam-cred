@@ -1,0 +1,60 @@
+# UdyamCred Stage 1 policy: shop categories and their selling-price margin bands.
+#
+# Margins are expressed as a fraction of selling price.
+# Reconciliation inverse formula (per spec):
+#     expected_sales = goods_sold / (1 + margin)
+# For a category range [margin_low, margin_high]:
+#     expected_sales_high = goods_sold / (1 + margin_low)   # lower margin -> higher expected sales
+#     expected_sales_low  = goods_sold / (1 + margin_high)  # higher margin -> lower expected sales
+#
+# `aggregates.kirana_overall` is a parent reference band (8-10%), not a leaf
+# shop category. The 8 leaf categories a shop can belong to live under
+# `shop_categories`.
+
+version: 1
+
+defaults:
+  # +/- tolerance applied to each category's margin band during reconciliation.
+  # Widens point-valued categories (e.g. kirana_with_inventory = 15%) so a single
+  # margin figure is still usable as a band.
+  tolerance: 0.005
+
+aggregates:
+  kirana_overall:
+    label: "Kirana stores (overall aggregate, 8-10%)"
+    margin_low: 0.08
+    margin_high: 0.10
+
+shop_categories:
+  kirana_with_inventory:
+    label: "Kirana with inventory tracking"
+    margin_low: 0.15
+    margin_high: 0.15
+  kirana_without_inventory:
+    label: "Kirana without inventory tracking"
+    margin_low: 0.10
+    margin_high: 0.10
+  branded_staples:
+    label: "Branded staples"
+    margin_low: 0.03
+    margin_high: 0.09
+  packaged_fmcg:
+    label: "Packaged FMCG"
+    margin_low: 0.07
+    margin_high: 0.14
+  beverages_impulse:
+    label: "Beverages and impulse items"
+    margin_low: 0.10
+    margin_high: 0.18
+  personal_care:
+    label: "Personal care"
+    margin_low: 0.12
+    margin_high: 0.20
+  general_merchandise:
+    label: "General merchandise"
+    margin_low: 0.14
+    margin_high: 0.25
+  loose_goods:
+    label: "Loose goods (sold by weight/volume)"
+    margin_low: 0.14
+    margin_high: 0.30
