@@ -37,9 +37,8 @@ class TestGoldenFile:
 
     def test_golden_verdicts_match_expected_mix(self, golden_df):
         counts = golden_df["verdict"].value_counts().to_dict()
-        assert counts.get("approved") == 5
-        assert counts.get("flagged") == 4
-        assert counts.get("rejected") == 1
+        assert counts.get("approved") == 4
+        assert counts.get("flagged") == 6
 
 
 class TestGoldenReproducibility:

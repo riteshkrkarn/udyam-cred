@@ -1,11 +1,11 @@
 # UdyamCred Stage 1 policy: shop categories and their selling-price margin bands.
 #
 # Margins are expressed as a fraction of selling price.
-# Reconciliation inverse formula (per spec):
-#     expected_sales = goods_sold / (1 + margin)
+# Reconciliation formula (margin on selling price):
+#     expected_sales = goods_sold / (1 - margin)
 # For a category range [margin_low, margin_high]:
-#     expected_sales_high = goods_sold / (1 + margin_low)   # lower margin -> higher expected sales
-#     expected_sales_low  = goods_sold / (1 + margin_high)  # higher margin -> lower expected sales
+#     expected_sales_low = goods_sold / (1 - margin_low)    # lower margin -> lower expected sales
+#     expected_sales_high = goods_sold / (1 - margin_high)  # higher margin -> higher expected sales
 #
 # `aggregates.kirana_overall` is a parent reference band (8-10%), not a leaf
 # shop category. The 8 leaf categories a shop can belong to live under

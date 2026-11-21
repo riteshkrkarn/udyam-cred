@@ -1,7 +1,15 @@
-"""UdyamCred Stage 1 FastAPI application.
+"""UdyamCred FastAPI application (Stage 1 + Stage 2).
 
-Exposes health, auth (JWT access + DB-stored rotating refresh + remember-me),
-and a verification endpoint that runs stock reconciliation on a submitted shop.
+Stage 1:
+  - Health, auth (JWT access + DB-stored rotating refresh + remember-me)
+  - Verification endpoint that runs stock reconciliation
+
+Stage 2:
+  - Application workflow (create, get, list, update status)
+  - Scoring orchestration (all engines in sequence)
+  - Replay and override functionality
+  - Document upload and household data management
+  - Consent tracking and audit trail
 
 Run the app:
     uvicorn main:app --reload
@@ -40,8 +48,9 @@ from app.schemas import (
     UserOut,
 )
 from app.utils import utcnow_naive
+from app.endpoints import scoring, applications, consent, documents, household, audit, scoring_phase1, photos, tranches, repayment
 
-app = FastAPI(title="UdyamCred", version="0.1.0", description="Stage 1 backend")
+app = FastAPI(title="UdyamCred", version="0.2.0", description="Stage 2 backend")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
@@ -169,3 +178,24 @@ def reconcile_endpoint(
 @app.get("/shops/me")
 def whoami(current_user: User = Depends(get_current_user)) -> dict:
     return {"id": current_user.id, "email": current_user.email, "role": current_user.role}
+
+
+# ============================================================================
+# Stage 2 Routers
+# ============================================================================
+
+app.include_router(scoring.router)
+app.include_router(applications.router)
+app.include_router(consent.router)
+app.include_router(documents.router)
+app.include_router(household.router)
+app.include_router(audit.router)
+
+# ============================================================================
+# Phase 1: Tiered Verification-First System Routers
+# ============================================================================
+
+app.include_router(scoring_phase1.router)
+app.include_router(photos.router)
+app.include_router(tranches.router)
+app.include_router(repayment.router)

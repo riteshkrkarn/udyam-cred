@@ -127,7 +127,7 @@ class TestProtected:
                 "shop_id": 0,
                 "gstin": "27AAACR5049K1Z5",
                 "shop_category": "kirana_without_inventory",
-                "purchases": 1_100_000,
+                "purchases": 900_000,  # goods_sold = 900_000; expected = 900_000 / (1 - 0.10) = 1_000_000
                 "gst_turnover": 1_000_000,
                 "upi_turnover": 500_000,
             },

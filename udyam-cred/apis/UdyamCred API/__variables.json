@@ -1,0 +1,48 @@
+{
+  "$schema": "https://assets.requestly.com/local/v1.20.0/collection-variables.json",
+  "base_url": {
+    "id": "1d6f3506-e3c7-4dbe-b26c-8896bd8ac843",
+    "syncValue": "http://localhost:8000",
+    "type": "string",
+    "isEnabled": true,
+    "rank": "a0",
+    "createdAt": "2026-11-20T19:08:10.729Z",
+    "updatedAt": "2026-11-20T19:08:10.729Z",
+    "createdBy": null,
+    "updatedBy": null,
+    "valueSource": {
+      "kind": "inline"
+    },
+    "overrideMeta": null
+  },
+  "token": {
+    "id": "573b2abd-87d5-416b-941c-635d2d36d280",
+    "syncValue": "",
+    "type": "string",
+    "isEnabled": true,
+    "rank": "a1",
+    "createdAt": "2026-11-20T19:08:10.729Z",
+    "updatedAt": "2026-11-20T19:08:10.729Z",
+    "createdBy": null,
+    "updatedBy": null,
+    "valueSource": {
+      "kind": "inline"
+    },
+    "overrideMeta": null
+  },
+  "refresh_token": {
+    "id": "deebaf82-ae5c-4020-8342-dea388a29b3f",
+    "syncValue": "",
+    "type": "string",
+    "isEnabled": true,
+    "rank": "a2",
+    "createdAt": "2026-11-20T19:08:10.729Z",
+    "updatedAt": "2026-11-20T19:08:10.729Z",
+    "createdBy": null,
+    "updatedBy": null,
+    "valueSource": {
+      "kind": "inline"
+    },
+    "overrideMeta": null
+  }
+}

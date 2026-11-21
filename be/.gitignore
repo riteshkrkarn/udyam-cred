@@ -21,3 +21,5 @@ venv/
 
 # Generated synthetic data (golden_expected.csv in tests/ is kept)
 data/synthetic/*.csv
+
+*.txt

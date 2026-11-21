@@ -1,0 +1,6 @@
+{
+  "$schema": "https://assets.requestly.com/local/v1.20.0/body.json",
+  "contentType": "json",
+  "raw": "{\n  \"shop_id\": \"shop_flagged_2\",\n  \"gstin\": \"29AABCR0102R1Z5\",\n  \"shop_category\": \"electronics\",\n  \"purchases\": 1000000,\n  \"gst_turnover\": 1100000,\n  \"upi_turnover\": 1500000\n}",
+  "rawContentType": "application/json"
+}

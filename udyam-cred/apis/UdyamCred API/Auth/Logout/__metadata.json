@@ -1,0 +1,10 @@
+{
+  "$schema": "https://assets.requestly.com/local/v1.20.0/metadata.json",
+  "type": "api",
+  "entryType": "http",
+  "id": "72ad27f3-2766-4c18-a07f-c8d8add9f166",
+  "rank": "a4",
+  "url": "{{base_url}}/auth/logout",
+  "method": "POST",
+  "contentType": "json"
+}
