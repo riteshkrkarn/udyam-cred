@@ -12,6 +12,11 @@ export default function AppHeader() {
 
   function close() { setNavOpen(false) }
 
+  function handleApply() {
+    close()
+    navigate('/apply')
+  }
+
   function handleDemoClick(route: string) {
     close()
     navigate(route)
@@ -44,28 +49,25 @@ export default function AppHeader() {
 
         {/* Nav links — role-aware */}
         <nav id="main-nav" className={navOpen ? 'open' : ''}>
-          {/* Always visible */}
-          <a href="/#how-it-works" onClick={close}>How it works</a>
-          <a href="/#check" onClick={close}>Stock check</a>
-
-          {/* Borrower-only */}
-          {(isBorrower || !currentRole) && (
-            <Link to="/apply" onClick={close}>Apply for loan</Link>
-          )}
-
-          {/* Officer / approver / auditor */}
-          {isOfficerOrAbove && (
-            <>
-              <Link to="/bank/queue" onClick={close}>Bank dashboard</Link>
-            </>
-          )}
-
-          {/* Borrower result — shows if they have an application */}
-          {isBorrower && state.useDemo && (
-            <Link to="/applications/demo_001/result" onClick={close}>
-              My application
-            </Link>
-          )}
+          <a href="/#how" onClick={close}>
+            How it works
+          </a>
+          <a href="/#tiers" onClick={close}>
+            Tiers
+          </a>
+          <a href="/#safeguards" onClick={close}>
+            Safeguards
+          </a>
+          <a href="/#trust" onClick={close}>
+            Check a shop
+          </a>
+          <button
+            type="button"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sheet)', font: '500 14px inherit', padding: 0 }}
+            onClick={handleApply}
+          >
+            Apply
+          </button>
         </nav>
 
         {/* Right-side actions */}
