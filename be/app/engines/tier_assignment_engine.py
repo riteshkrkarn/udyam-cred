@@ -98,7 +98,7 @@ class TierAssignmentEngine:
             ]
             and gst_registered
             and udyam_registered
-            and (prior_repayment_history is True)
+            and (prior_repayment_history is not None)
         ):
             reasons.append(
                 f"Verified {verified_months} months of bank data with GST/UPI"
@@ -201,9 +201,9 @@ class TierAssignmentEngine:
                 f"Only {verified_months} months of verified data (requires 6+)"
             )
             next_tier_criteria.append("Provide 6+ months of bank statement history")
-        elif not gst_registered:
-            reasons.append("Not registered for GST")
-            next_tier_criteria.append("Register for GST to qualify for lending")
+        elif gst_registered:
+            reasons.append("GST registered but insufficient months for Tier 2")
+            next_tier_criteria.append("Accumulate 12+ months of verified data to qualify for Tier 2")
         elif source_agreement_score < 0.65:
             reasons.append(
                 f"Sales sources only agree {source_agreement_score * 100:.0f}% (requires 65%+)"

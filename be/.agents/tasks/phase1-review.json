@@ -1,0 +1,46 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "issue": "Phase 1 database tables not declared",
+      "description": "Models.py missing Tier, Photo, SourceAgreement, VerifiedWindow, GSTCoverage, Tranche, RepaymentRecord, StopRule, LocationVerification, RateEnvironment schema declarations. All Phase 1 tests and endpoints depend on these tables.",
+      "action": "Add complete SQLAlchemy model definitions to models.py and run database migration."
+    },
+    {
+      "issue": "78 failing tests, 54% coverage vs 85% target",
+      "description": "Test failures span engine method mismatches, database table errors, and logic bugs. Coverage far below required threshold.",
+      "action": "Fix all test failures and bring coverage to >85%."
+    },
+    {
+      "issue": "Tier assignment logic incorrect",
+      "description": "Tests show tier 3 conditions being assigned as tier 2, and tier 1 conditions incorrectly rejecting applicants. Boundary conditions or inverted booleans likely.",
+      "action": "Review tier rule implementation against spec and fix boundary conditions and threshold comparisons."
+    },
+    {
+      "issue": "Source agreement engine weights incorrect",
+      "description": "Calculated weighted sales 73500 expected to be > 80000. Spec requires 60% AA / 30% GST / 10% UPI weighting but implementation is using different weights.",
+      "action": "Verify and fix weighted sales formula to match 60/30/10 specification."
+    },
+    {
+      "issue": "GST coverage engine missing public method",
+      "description": "Tests call GSTCoverageEngine.verify_coverage() but method is not defined. Implementation likely has a different method name.",
+      "action": "Add or rename verify_coverage() method to match test contract."
+    },
+    {
+      "issue": "Verified window engine method signature mismatch",
+      "description": "Tests call VerifiedWindowEngine.calculate_verified_window() but method not found. Class likely uses a different method name.",
+      "action": "Add or rename calculate_verified_window() method to match test contract."
+    },
+    {
+      "issue": "Rate adapter set_industry_rates() has wrong signature",
+      "description": "Test failure shows 'got multiple values for argument tier_1', indicating method signature does not match usage pattern.",
+      "action": "Fix set_industry_rates() signature to be classmethod or ensure instance method is called correctly."
+    },
+    {
+      "issue": "Decision model schema migration incomplete",
+      "description": "Tests still pass loan_amount to Decision constructor but spec requires tier, verified_months, source_agreement_score, location_verified, photo_count, tranche_plan_json.",
+      "action": "Complete Decision model field migration; verify all old fields removed and new fields present."
+    }
+  ],
+  "reviewDoc": "d:\\Hackathon\\udyam-cred\\be\\.agents\\tasks\\phase1-review.md"
+}

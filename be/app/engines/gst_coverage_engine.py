@@ -67,3 +67,19 @@ class GSTCoverageEngine:
             reconciliation_flag=reconciliation_flag,
             notes=notes,
         )
+
+    @staticmethod
+    def verify_coverage(
+        purchases_from_bills: float, gst_turnover: float
+    ) -> GSTCoverageResult:
+        """
+        Alias for check_coverage. Verify GST coverage.
+
+        Args:
+            purchases_from_bills: Total purchases declared on bills (cost of goods)
+            gst_turnover: Total turnover from GST filings (selling price)
+
+        Returns:
+            GSTCoverageResult with coverage metrics
+        """
+        return GSTCoverageEngine.check_coverage(purchases_from_bills, gst_turnover)

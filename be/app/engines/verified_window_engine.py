@@ -189,3 +189,29 @@ class VerifiedWindowEngine:
             data_quality_score=quality_score,
             weight_factor=weight_factor,
         )
+
+    @staticmethod
+    def calculate_verified_window(
+        aa_start: Optional[datetime] = None,
+        aa_end: Optional[datetime] = None,
+        gst_start: Optional[datetime] = None,
+        gst_end: Optional[datetime] = None,
+        upi_start: Optional[datetime] = None,
+        upi_end: Optional[datetime] = None,
+        tier_min_months: int = 6,
+    ) -> VerifiedWindowResult:
+        """
+        Alias for calculate_verification. Calculate verified window and quality metrics.
+
+        Args:
+            aa_start, aa_end: Account Aggregator data period
+            gst_start, gst_end: GST data period
+            upi_start, upi_end: UPI data period
+            tier_min_months: Minimum months required for this tier
+
+        Returns:
+            VerifiedWindowResult with window details
+        """
+        return VerifiedWindowEngine.calculate_verification(
+            aa_start, aa_end, gst_start, gst_end, upi_start, upi_end, tier_min_months
+        )
