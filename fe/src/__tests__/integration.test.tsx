@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 /**
  * Integration Tests: Phase 1-2 Migration Frontend
  * Tests complete workflows for borrowers and bank officers

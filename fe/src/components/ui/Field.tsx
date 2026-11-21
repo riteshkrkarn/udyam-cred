@@ -13,7 +13,7 @@ interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string
   note?: string
   error?: string
-  options?: { value: string; label: string }[]
+  options?: { value: string; label: string }[] | readonly { value: string; label: string }[]
 }
 
 const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(

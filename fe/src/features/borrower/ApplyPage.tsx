@@ -10,10 +10,14 @@ const schema = z.object({
     .number()
     .min(10_000, 'Minimum loan amount is ₹10,000.')
     .max(2_000_000, 'Maximum loan amount is ₹20,00,000.'),
-  purpose: z.enum(
-    ['Stock purchase', 'Festival stock', 'Shop expansion', 'Working capital', 'Other'],
-  ).refine(v => v !== '', 'Choose a purpose.'),
-  consent: z.literal(true).refine(v => v === true, 'Consent is required.'),
+  purpose: z.enum([
+    'Stock purchase',
+    'Festival stock',
+    'Shop expansion',
+    'Working capital',
+    'Other',
+  ]),
+  consent: z.literal(true),
 })
 
 type FormValues = z.infer<typeof schema>

@@ -2,22 +2,27 @@ import StepList from '../../components/ui/StepList'
 
 const STEPS = [
   {
+    num: 1,
     title: 'Collect consent and basic details',
     desc: 'The shop owner agrees to share purchase bills, UPI and bank statements, and a monthly ledger page. Only these sources are used. Consent can be withdrawn at any time.',
   },
   {
+    num: 2,
     title: 'Verify the supplier exists',
     desc: 'The GSTIN on each major purchase bill is checked against the GST registry. This confirms the supplier is registered — not that the purchase happened.',
   },
   {
+    num: 3,
     title: 'Run the stock reconciliation',
     desc: "Opening stock plus purchases minus closing stock gives the cost of goods sold. Adding the shop's typical margin gives implied revenue. That is compared to the UPI inflow.",
   },
   {
+    num: 4,
     title: 'Cross-check with other sources',
     desc: 'Electricity consumption, rent paid and any available bank or ledger data are compared against the implied revenue figure to look for large gaps.',
   },
   {
+    num: 5,
     title: 'Score and decide',
     desc: 'The scorecard combines reconciliation results, source agreement and vintage into a risk band. The loan rule engine sets the amount, rate and tenor. A loan officer reviews the result and can override with a written reason.',
   },
