@@ -150,6 +150,27 @@ class Application(Base):
     data_sources = relationship(
         "DataSource", back_populates="application", cascade="all, delete-orphan"
     )
+    photos = relationship(
+        "Photo", back_populates="application", cascade="all, delete-orphan"
+    )
+    source_agreement = relationship(
+        "SourceAgreement", back_populates="application", cascade="all, delete-orphan", uselist=False
+    )
+    verified_window = relationship(
+        "VerifiedWindow", back_populates="application", cascade="all, delete-orphan", uselist=False
+    )
+    gst_coverage = relationship(
+        "GSTCoverage", back_populates="application", cascade="all, delete-orphan", uselist=False
+    )
+    tranches = relationship(
+        "Tranche", back_populates="application", cascade="all, delete-orphan"
+    )
+    stop_rule = relationship(
+        "StopRule", back_populates="application", cascade="all, delete-orphan", uselist=False
+    )
+    location_verification = relationship(
+        "LocationVerification", back_populates="application", cascade="all, delete-orphan", uselist=False
+    )
 
 
 class Consent(Base):
@@ -201,6 +222,185 @@ class HouseholdData(Base):
     application = relationship("Application", back_populates="household_data")
 
 
+class Tier(Base):
+    __tablename__ = "tiers"
+
+    id = Column(Integer, primary_key=True)
+    tier_id = Column(Integer, unique=True, nullable=False, index=True)
+    name = Column(String(64), nullable=False)
+    min_verified_months = Column(Integer, nullable=False)
+    min_amount = Column(Float, nullable=False)
+    max_amount = Column(Float, nullable=False)
+    rate_adjustment = Column(Float, nullable=False)
+    confidence_threshold = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+
+class Photo(Base):
+    __tablename__ = "photos"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True
+    )
+    photo_type = Column(
+        String(32), nullable=False
+    )  # shop_front | shelves | bills | rent_receipt | udyam | gst
+    photo_path = Column(String(512), nullable=False)
+    location_lat = Column(Float, nullable=True)
+    location_lng = Column(Float, nullable=True)
+    timestamp = Column(DateTime, nullable=True)
+    random_code_written = Column(String(100), nullable=True)
+    verification_status = Column(String(32), default="pending")  # pending | verified | rejected
+    verified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="photos")
+
+
+class SourceAgreement(Base):
+    __tablename__ = "source_agreements"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True, unique=True
+    )
+    upi_monthly_avg = Column(Float, nullable=True)
+    aa_monthly_avg = Column(Float, nullable=True)
+    gst_monthly_avg = Column(Float, nullable=True)
+    agreement_score_percent = Column(Float, nullable=False)
+    weighted_sales = Column(Float, nullable=False)
+    sources_used = Column(String(100), nullable=False)  # CSV: aa,gst,upi
+    confidence = Column(String(32), nullable=False)  # low | medium | high
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="source_agreement")
+
+
+class VerifiedWindow(Base):
+    __tablename__ = "verified_windows"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True, unique=True
+    )
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    months_verified = Column(Integer, nullable=False)
+    data_quality_score = Column(Float, nullable=False)
+    weighted_importance = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="verified_window")
+
+
+class GSTCoverage(Base):
+    __tablename__ = "gst_coverage"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True, unique=True
+    )
+    purchases_declared = Column(Float, nullable=False)
+    gst_turnover = Column(Float, nullable=False)
+    coverage_percent = Column(Float, nullable=False)
+    reconciliation_flag = Column(Boolean, nullable=False, default=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="gst_coverage")
+
+
+class Tranche(Base):
+    __tablename__ = "tranches"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True
+    )
+    tranche_num = Column(Integer, nullable=False)
+    amount = Column(Float, nullable=False)
+    release_date = Column(DateTime, nullable=False)
+    release_status = Column(
+        String(32), nullable=False, default="pending"
+    )  # pending | released | repaid
+    emi_count = Column(Integer, nullable=False)
+    tenor_months = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="tranches")
+    repayment_records = relationship(
+        "RepaymentRecord", back_populates="tranche", cascade="all, delete-orphan"
+    )
+
+
+class RepaymentRecord(Base):
+    __tablename__ = "repayment_records"
+
+    id = Column(Integer, primary_key=True)
+    tranche_id = Column(
+        Integer, ForeignKey("tranches.id"), nullable=False, index=True
+    )
+    emi_num = Column(Integer, nullable=False)
+    due_date = Column(DateTime, nullable=False)
+    amount = Column(Float, nullable=False)
+    paid_date = Column(DateTime, nullable=True)
+    payment_status = Column(
+        String(32), nullable=False, default="pending"
+    )  # pending | ontime | late | missed | bounced
+    days_late = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    tranche = relationship("Tranche", back_populates="repayment_records")
+
+
+class StopRule(Base):
+    __tablename__ = "stop_rules"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True, unique=True
+    )
+    missed_emi_count = Column(Integer, nullable=False, default=0)
+    frozen_date = Column(DateTime, nullable=True)
+    review_required = Column(Boolean, nullable=False, default=False)
+    unfrozen_date = Column(DateTime, nullable=True)
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="stop_rule")
+
+
+class LocationVerification(Base):
+    __tablename__ = "location_verifications"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(
+        Integer, ForeignKey("applications.id"), nullable=False, index=True, unique=True
+    )
+    rent_address = Column(String(512), nullable=True)
+    shop_address = Column(String(512), nullable=True)
+    photo_location_lat = Column(Float, nullable=True)
+    photo_location_lng = Column(Float, nullable=True)
+    distance_meters = Column(Float, nullable=True)
+    verified_bool = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+    application = relationship("Application", back_populates="location_verification")
+
+
+class RateEnvironment(Base):
+    __tablename__ = "rate_environments"
+
+    id = Column(Integer, primary_key=True)
+    rate_date = Column(DateTime, nullable=False, unique=True, index=True)
+    tier_1_industry_rate = Column(Float, nullable=False)
+    tier_2_industry_rate = Column(Float, nullable=False)
+    tier_3_industry_rate = Column(Float, nullable=False)
+    source = Column(String(32), nullable=False)  # manual | api
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+
+
 class Decision(Base):
     __tablename__ = "decisions"
 
@@ -209,24 +409,19 @@ class Decision(Base):
         Integer, ForeignKey("applications.id"), nullable=False, index=True
     )
     verdict = Column(String(32), nullable=False)  # approved | rejected
-    loan_amount = Column(Float, nullable=False)
-    rate_percent = Column(Float, nullable=True)
-    emi_monthly = Column(Float, nullable=True)
-    confidence = Column(Float, nullable=False, default=0.0)
-    reasons_json = Column(Text, nullable=True)  # JSON-serialized list of reason codes
+    tier = Column(Integer, nullable=True)
+    verified_months = Column(Integer, nullable=True)
+    source_agreement_score = Column(Float, nullable=True)
+    location_verified = Column(Boolean, nullable=True)
+    photo_count = Column(Integer, nullable=True, default=0)
+    tranche_plan_json = Column(Text, nullable=True)  # JSON-serialized tranche plan
+    reasons_json = Column(Text, nullable=True)  # JSON-serialized list of reasons
     replay_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=utcnow_naive, nullable=False)
 
     application = relationship("Application", back_populates="decisions")
     overrides = relationship(
         "Override", back_populates="decision", cascade="all, delete-orphan"
-    )
-    audit_logs = relationship(
-        "AuditLog", 
-        foreign_keys="AuditLog.entity_id",
-        primaryjoin="and_(AuditLog.entity_type=='decision', AuditLog.entity_id==Decision.id)",
-        cascade="all, delete-orphan",
-        viewonly=True
     )
 
 

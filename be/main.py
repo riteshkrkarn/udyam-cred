@@ -48,7 +48,7 @@ from app.schemas import (
     UserOut,
 )
 from app.utils import utcnow_naive
-from app.endpoints import scoring, applications, consent, documents, household, audit
+from app.endpoints import scoring, applications, consent, documents, household, audit, scoring_phase1, photos, tranches, repayment
 
 app = FastAPI(title="UdyamCred", version="0.2.0", description="Stage 2 backend")
 
@@ -190,3 +190,12 @@ app.include_router(consent.router)
 app.include_router(documents.router)
 app.include_router(household.router)
 app.include_router(audit.router)
+
+# ============================================================================
+# Phase 1: Tiered Verification-First System Routers
+# ============================================================================
+
+app.include_router(scoring_phase1.router)
+app.include_router(photos.router)
+app.include_router(tranches.router)
+app.include_router(repayment.router)

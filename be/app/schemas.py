@@ -235,3 +235,130 @@ class DecisionAuditOut(BaseModel):
     replay_count: int
     overrides: list[OverrideOut]
     created_at: str
+
+
+# ============================================================================
+# Phase 1: Tiered Verification-First System Schemas
+# ============================================================================
+
+
+class TrancheDetailOut(BaseModel):
+    """Single tranche details."""
+
+    tranche_num: int
+    amount: float
+    release_date: str
+    tenor_months: int
+
+
+class Phase1DecisionOut(BaseModel):
+    """Phase 1 decision output."""
+
+    decision_id: int
+    verdict: str  # approved | rejected
+    tier: int | None
+    approved_amount: float
+    rate_percent: float | None
+    tranche_plan: list[TrancheDetailOut] = []
+    emi_schedule: list[EMIScheduleItem] = []
+    verified_months: int | None
+    source_agreement_score: float | None
+    location_verified: bool | None
+    photo_count: int | None
+    reasons: list[str]
+    next_tier_criteria: list[str]
+
+
+class ScoringPhase1Input(BaseModel):
+    """Input for Phase 1 scoring endpoint."""
+
+    application_id: int
+    consent_given: bool
+    family_size: int = Field(..., gt=0)
+    monthly_expenses: float = Field(..., gt=0)
+
+
+class PhotoUploadInput(BaseModel):
+    """Upload a photo."""
+
+    photo_type: str  # shop_front | shelves | bills | rent_receipt | udyam | gst
+    photo_path: str
+    location_lat: float | None = None
+    location_lng: float | None = None
+    random_code_written: str | None = None
+
+
+class PhotoOut(BaseModel):
+    """Photo response."""
+
+    id: int
+    application_id: int
+    photo_type: str
+    photo_path: str
+    location_lat: float | None
+    location_lng: float | None
+    verification_status: str
+    verified_at: str | None
+
+
+class TrancheListOut(BaseModel):
+    """Tranche list response."""
+
+    id: int
+    tranche_num: int
+    amount: float
+    release_date: str
+    release_status: str
+    emi_count: int
+    tenor_months: int
+
+
+class TrancheDetailsOut(BaseModel):
+    """Tranche details with EMI history."""
+
+    id: int
+    tranche_num: int
+    amount: float
+    release_date: str
+    release_status: str
+    emi_count: int
+    tenor_months: int
+    repayment_history: list[dict] = []
+
+
+class RepaymentStatusOut(BaseModel):
+    """Repayment status response."""
+
+    tranche_num: int
+    emi_num: int
+    due_date: str
+    amount: float
+    paid_date: str | None
+    payment_status: str  # pending | ontime | late | missed | bounced
+    days_late: int
+
+
+class NextEMIOut(BaseModel):
+    """Next EMI due response."""
+
+    tranche_num: int
+    emi_num: int
+    due_date: str
+    amount: float
+    principal: float
+    interest: float
+
+
+class RepaymentMonitorOut(BaseModel):
+    """Officer view of all borrowers' EMI status."""
+
+    application_id: int
+    borrower_email: str
+    tier: int
+    total_approved_amount: float
+    on_time_count: int
+    late_count: int
+    missed_count: int
+    bounced_count: int
+    stop_rule_active: bool
+    last_emi_date: str | None
