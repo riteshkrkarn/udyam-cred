@@ -417,6 +417,13 @@ class Decision(Base):
     tranche_plan_json = Column(Text, nullable=True)  # JSON-serialized tranche plan
     reasons_json = Column(Text, nullable=True)  # JSON-serialized list of reasons
     replay_count = Column(Integer, nullable=False, default=0)
+    
+    # DEPRECATED: Old schema fields for backward compatibility. Use tier, verified_months, tranche_plan_json instead.
+    loan_amount = Column(Float, nullable=True)
+    rate_percent = Column(Float, nullable=True)
+    emi_monthly = Column(Float, nullable=True)
+    confidence = Column(Float, nullable=True)
+    
     created_at = Column(DateTime, default=utcnow_naive, nullable=False)
 
     application = relationship("Application", back_populates="decisions")

@@ -303,16 +303,26 @@ class TestDecisionModel:
         db_session.add(app)
         db_session.commit()
 
-        reasons = ["stable_cash_flow", "good_vintage"]
+        reasons = ["verified_10_months", "good_agreement_score"]
         reasons_json = json.dumps(reasons)
+        
+        tranche_plan = [
+            {
+                "tranche_num": 1,
+                "amount": 80000,
+                "tenor_months": 12,
+                "emi_count": 12,
+            }
+        ]
+        tranche_plan_json = json.dumps(tranche_plan)
 
         decision = Decision(
             application_id=app.id,
             verdict="approved",
-            loan_amount=80000,
-            rate_percent=12.5,
-            emi_monthly=6850,
-            confidence=0.85,
+            tier=1,
+            verified_months=10,
+            source_agreement_score=0.85,
+            tranche_plan_json=tranche_plan_json,
             reasons_json=reasons_json,
         )
         db_session.add(decision)
@@ -322,10 +332,11 @@ class TestDecisionModel:
         retrieved = db_session.query(Decision).filter_by(id=decision.id).first()
         assert retrieved is not None
         assert retrieved.verdict == "approved"
-        assert retrieved.loan_amount == 80000
-        assert retrieved.rate_percent == 12.5
-        assert retrieved.confidence == 0.85
+        assert retrieved.tier == 1
+        assert retrieved.verified_months == 10
+        assert retrieved.source_agreement_score == 0.85
         assert json.loads(retrieved.reasons_json) == reasons
+        assert json.loads(retrieved.tranche_plan_json)[0]["amount"] == 80000
 
 
 class TestOverrideModel:
@@ -350,13 +361,23 @@ class TestOverrideModel:
         db_session.add(app)
         db_session.commit()
 
+        tranche_plan = [
+            {
+                "tranche_num": 1,
+                "amount": 80000,
+                "tenor_months": 12,
+                "emi_count": 12,
+            }
+        ]
+        tranche_plan_json = json.dumps(tranche_plan)
+
         decision = Decision(
             application_id=app.id,
             verdict="approved",
-            loan_amount=80000,
-            rate_percent=12.5,
-            emi_monthly=6850,
-            confidence=0.85,
+            tier=1,
+            verified_months=10,
+            source_agreement_score=0.85,
+            tranche_plan_json=tranche_plan_json,
         )
         db_session.add(decision)
         db_session.commit()
@@ -485,7 +506,9 @@ class TestModelRelationships:
         decision = Decision(
             application_id=app.id,
             verdict="approved",
-            loan_amount=80000,
+            tier=1,
+            verified_months=10,
+            source_agreement_score=0.80,
         )
         db_session.add(decision)
         db_session.commit()
