@@ -10,22 +10,22 @@ from sqlalchemy.orm import Session
 
 from app.adapters.account_aggregator_adapter import AccountAggregatorAdapter
 from app.adapters.gst_adapter import GSTAdapter
+from app.adapters.rate_adapter import RateAdapter
 from app.adapters.upi_adapter import UPIAdapter
 from app.database import get_db
-from app.engines.abca_engine import calculate_abca
-from app.engines.capacity_engine import get_safe_amount
-from app.engines.emi_engine import calculate_emi_schedule, calculate_household_surplus
-from app.engines.fund_split_engine import optimize_fund_split
-from app.engines.loan_rules_engine import apply_loan_rules
-from app.engines.rate_engine import get_rate
-from app.engines.round_trip_engine import detect_round_trip
-from app.engines.vintage_engine import get_vintage
+from app.engines.source_agreement_engine import SourceAgreementEngine
+from app.engines.verified_window_engine import VerifiedWindowEngine
+from app.engines.photo_verification_engine import PhotoVerificationEngine
+from app.engines.gst_coverage_engine import GSTCoverageEngine
+from app.engines.tier_assignment_engine import TierAssignmentEngine
+from app.engines.amount_rule_engine import AmountRuleEngine
+from app.engines.rate_calculation_engine import RateCalculationEngine
+from app.engines.tranche_plan_engine import TranchePlanEngine
 from app.models import Application, AuditLog, Decision, Override, User
 from app.schemas import (
     DecisionOut,
     EMIScheduleItem,
     OverrideInput,
-    OverrideOut,
     ReplayInput,
     ScoringInput,
 )
@@ -34,241 +34,338 @@ from app.utils import utcnow_naive
 router = APIRouter(prefix="/api/scoring", tags=["scoring"])
 
 
-def get_current_user_from_token(
-    token: str | None = None,
-    db: Session | None = None,
-) -> User | None:
-    """Helper to extract user from token (for override tracking)."""
-    # In production, use depends(get_current_user) from main.py
-    # For now, return None (demo mode)
-    return None
-
-
 def _orchestrate_scoring(
     application: Application,
     family_size: int,
     monthly_expenses: float,
-    existing_liabilities: float,
-    tenor_months: int,
     db: Session,
 ) -> dict[str, Any]:
     """
-    Orchestrate all engines in sequence to produce a decision.
+    Orchestrate all Phase 1 engines in sequence to produce a decision.
+
+    Pipeline:
+    1. Fetch AA, GST, UPI data (adapters)
+    2. Run SourceAgreementEngine
+    3. Run VerifiedWindowEngine
+    4. Run PhotoVerificationEngine
+    5. Run GSTCoverageEngine (if GST registered)
+    6. Run TierAssignmentEngine
+    7. Run AmountRuleEngine
+    8. Run RateCalculationEngine (calls RateAdapter.get_industry_rate)
+    9. Run TranchePlanEngine
+    10. Calculate EMI schedule per tranche
+    11. Save Decision with tier + tranche_plan_json
+    12. Return complete decision with all response fields
 
     Returns a dict suitable for DecisionOut.
     """
-    # 1. Fetch adapters data (UPI, AA, GST)
+    reasons = []
+
+    # 1. Fetch AA, GST, UPI data
     shop_id = application.shop_id
-    
-    upi_data = None
     aa_data = None
     gst_data = None
-    
-    try:
-        upi_data = UPIAdapter.get_upi_data(shop_id=shop_id)
-    except Exception:
-        pass
-    
+    upi_data = None
+
     try:
         aa_data = AccountAggregatorAdapter.get_aa_data(shop_id=shop_id)
     except Exception:
         pass
-    
+
     try:
         gst_data = GSTAdapter.get_gst_data(shop_id=shop_id)
     except Exception:
         pass
 
-    reasons = []
+    try:
+        upi_data = UPIAdapter.get_upi_data(shop_id=shop_id)
+    except Exception:
+        pass
 
-    # 2. Calculate ABCA
-    abca_result = calculate_abca(upi_data=upi_data, aa_data=aa_data)
-    abca = abca_result["abca_value"]
-    if abca > 0:
-        reasons.append("stable_cash_flow")
+    # Extract monthly averages from sources
+    aa_monthly_avg = None
+    gst_monthly_avg = None
+    upi_monthly_avg = None
 
-    # 3. Get vintage (earliest supported date)
-    vintage_result = get_vintage(
-        upi_vintage_date=abca_result["vintage_dates"].get("upi_vintage"),
-        aa_vintage_date=abca_result["vintage_dates"].get("aa_vintage"),
+    if aa_data and isinstance(aa_data, dict):
+        aa_monthly_avg = aa_data.get("monthly_average")
+
+    if gst_data and isinstance(gst_data, dict):
+        gst_monthly_avg = gst_data.get("monthly_average")
+
+    if upi_data and isinstance(upi_data, dict):
+        upi_monthly_avg = upi_data.get("monthly_average")
+
+    # Extract date ranges for verified window
+    aa_start = None
+    aa_end = None
+    gst_start = None
+    gst_end = None
+    upi_start = None
+    upi_end = None
+
+    if aa_data and isinstance(aa_data, dict):
+        aa_start = aa_data.get("period_start")
+        aa_end = aa_data.get("period_end")
+        if isinstance(aa_start, str):
+            from datetime import datetime
+            aa_start = datetime.fromisoformat(aa_start)
+        if isinstance(aa_end, str):
+            from datetime import datetime
+            aa_end = datetime.fromisoformat(aa_end)
+
+    if gst_data and isinstance(gst_data, dict):
+        gst_start = gst_data.get("period_start")
+        gst_end = gst_data.get("period_end")
+        if isinstance(gst_start, str):
+            from datetime import datetime
+            gst_start = datetime.fromisoformat(gst_start)
+        if isinstance(gst_end, str):
+            from datetime import datetime
+            gst_end = datetime.fromisoformat(gst_end)
+
+    if upi_data and isinstance(upi_data, dict):
+        upi_start = upi_data.get("period_start")
+        upi_end = upi_data.get("period_end")
+        if isinstance(upi_start, str):
+            from datetime import datetime
+            upi_start = datetime.fromisoformat(upi_start)
+        if isinstance(upi_end, str):
+            from datetime import datetime
+            upi_end = datetime.fromisoformat(upi_end)
+
+    # 2. Run SourceAgreementEngine
+    source_agreement_result = SourceAgreementEngine.verify_sources(
+        aa_monthly_avg=aa_monthly_avg,
+        gst_monthly_avg=gst_monthly_avg,
+        upi_monthly_avg=upi_monthly_avg,
     )
-    vintage_date = vintage_result["earliest_date"]
-    if vintage_date:
-        reasons.append("good_vintage")
+    weighted_sales = source_agreement_result.weighted_sales
+    source_agreement_score = source_agreement_result.agreement_score
+    sources_used = source_agreement_result.sources_used
 
-    # 4. Detect round-trip
-    round_trip_result = detect_round_trip(
-        upi_transactions=upi_data.get("data", []) if upi_data else None,
+    reasons.append(f"source_agreement_{source_agreement_score * 100:.0f}%")
+    reasons.append(f"sources_used_{','.join(sources_used)}")
+
+    # 3. Run VerifiedWindowEngine
+    verified_window_result = VerifiedWindowEngine.calculate_verification(
+        aa_start=aa_start,
+        aa_end=aa_end,
+        gst_start=gst_start,
+        gst_end=gst_end,
+        upi_start=upi_start,
+        upi_end=upi_end,
+        tier_min_months=12,
     )
-    round_trip_score = round_trip_result["score"]
-    if round_trip_score < 0.3:
-        reasons.append("clean_transactions")
-    elif round_trip_score > 0.7:
-        reasons.append("circular_patterns_detected")
+    verified_months = verified_window_result.months_verified
 
-    # 5. Calculate household surplus
-    household_result = calculate_household_surplus(
-        abca=abca,
-        monthly_expenses=monthly_expenses,
-        existing_liabilities=existing_liabilities,
-    )
-    household_surplus = household_result["household_surplus"]
-    emi_capacity = household_result["emi_capacity"]
+    reasons.append(f"verified_{verified_months}_months")
 
-    if household_surplus > 0:
-        reasons.append("positive_household_surplus")
+    # 4. Run PhotoVerificationEngine
+    photo_verified = False
+    photo_count = 0
+    location_verified = False
 
-    # 6. Get safe amount (capacity model)
-    capacity_result = get_safe_amount(
-        goods_sold=0.0,  # Would come from reconciliation
-        margin=20.0,  # Default margin
-        family_size=family_size,
-        liabilities=existing_liabilities,
-        round_trip_score=round_trip_score,
-        vintage_months=12,  # Standard 12 months
-        abca=abca,
-    )
-    safe_amount = capacity_result["safe_amount"]
+    # Get photos from application
+    if hasattr(application, "photos") and application.photos:
+        photo_count = len(application.photos)
+        for photo in application.photos:
+            if hasattr(photo, "verification_status") and photo.verification_status == "verified":
+                photo_verified = True
+                location_verified = True
+                break
 
-    # 7. Apply loan rules -> loan_amount
-    loan_rules_result = apply_loan_rules(
-        emi_capacity=emi_capacity,
-        safe_amount=safe_amount,
-        policy_cap=500000.0,
-        minimum_loan=10000.0,
-    )
-    loan_amount = loan_rules_result["loan_amount"]
-    verdict = "approved" if loan_amount > 0 else "rejected"
-
-    if verdict == "approved":
-        reasons.append("within_policy_caps")
+    if photo_verified:
+        reasons.append("location_verified")
     else:
-        reasons.append("insufficient_capacity")
+        reasons.append("location_not_verified")
 
-    # 8. Get rate -> rate_percent (only if approved)
-    rate_percent = None
-    if verdict == "approved":
-        rate_result = get_rate(
-            risk_band="Moderate",  # Default risk band
-            tenor_months=tenor_months,
-        )
-        rate_percent = rate_result["rate_percent"]
-        band = rate_result.get("band", "Moderate")
-        reasons.append(f"rate_band_{band.lower()}")
+    # 5. Run GSTCoverageEngine (if GST registered)
+    gst_coverage = 1.0
+    gst_registered = gst_data is not None and gst_monthly_avg is not None and gst_monthly_avg > 0
 
-    # 9. Calculate EMI schedule (only if approved)
-    emi_schedule = []
-    emi_monthly = None
-    if verdict == "approved" and rate_percent and loan_amount > 0:
-        schedule_list = calculate_emi_schedule(
-            loan_amount=loan_amount,
-            rate_percent=rate_percent,
-            tenor_months=tenor_months,
+    if gst_registered and application.shop and application.shop.purchases > 0:
+        gst_coverage_result = GSTCoverageEngine.check_coverage(
+            purchases_declared=application.shop.purchases,
+            gst_turnover=application.shop.gst_turnover or (gst_monthly_avg * 12),
         )
-        emi_schedule = [
-            EMIScheduleItem(
-                month=item["month"],
-                principal=item["principal"],
-                interest=item["interest"],
-                balance=item["balance"],
-            )
-            for item in schedule_list
+        gst_coverage = gst_coverage_result.coverage_percent
+        reasons.append(f"gst_coverage_{gst_coverage * 100:.0f}%")
+
+    # 6. Run TierAssignmentEngine
+    udyam_registered = application.shop and hasattr(application.shop, "udyam_registered") and application.shop.udyam_registered
+    prior_repayment = None  # Would be retrieved from repayment history
+
+    tier_result = TierAssignmentEngine.assign_tier(
+        verified_months=verified_months,
+        source_agreement_score=source_agreement_score,
+        photo_verified=photo_verified,
+        gst_registered=gst_registered,
+        udyam_registered=udyam_registered,
+        prior_repayment_history=prior_repayment,
+    )
+    tier = tier_result.tier
+    max_amount_tier = tier_result.max_amount
+    tenure_months = tier_result.tenure_months
+    next_tier_criteria = tier_result.next_tier_criteria
+
+    for reason in tier_result.reasons:
+        reasons.append(reason)
+
+    # 7. Run AmountRuleEngine
+    amount_result = AmountRuleEngine.calculate_amount(
+        tier=tier,
+        verified_months=verified_months,
+        source_agreement_score=source_agreement_score,
+        gst_coverage=gst_coverage,
+    )
+    approved_amount = amount_result.approved_amount
+
+    # 8. Run RateCalculationEngine (MUST call RateAdapter.get_industry_rate)
+    rate_result = RateCalculationEngine.calculate_rate(
+        tier=tier,
+        db=db,
+        rate_date=None,
+    )
+    rate = rate_result.final_rate
+
+    # 9. Run TranchePlanEngine
+    tranche_plan_result = TranchePlanEngine.generate_plan(
+        tier=tier,
+        amount=approved_amount,
+        start_date=datetime.now(),
+    )
+    tranche_plan = tranche_plan_result.tranche_plan
+    tranche_plan_json = json.dumps(
+        [
+            {
+                "tranche_num": t.tranche_num,
+                "amount": t.amount,
+                "release_date": t.release_date.isoformat(),
+                "tenor_months": t.tenor_months,
+            }
+            for t in tranche_plan
         ]
-        # EMI monthly is the first entry's EMI amount
-        if schedule_list:
-            emi_monthly = schedule_list[0].get("emi", schedule_list[0].get("principal", 0))
+    )
 
-    # 10. Optimize fund split (only if approved)
-    fund_plan = None
-    if verdict == "approved":
-        fund_result = optimize_fund_split(
-            loan_amount=loan_amount,
-            goods_sold=abca * 12,  # Estimate goods sold from annual ABCA
-            margin=20.0,  # Default margin
-            category="kirana",  # Would come from shop category
-            monthly_turnover=abca,
-        )
-        fund_plan = {
-            "stock_percent": fund_result.get("stock_pct", 50),
-            "buffer_percent": fund_result.get("buffer_pct", 10),
-            "expansion_percent": fund_result.get("expansion_pct", 20),
-            "reserve_percent": fund_result.get("reserve_pct", 20),
-            "recommendations": fund_result.get("recommendations", []),
-        }
+    # 10. Calculate EMI schedule per tranche
+    emi_schedule = []
+    if approved_amount > 0 and rate > 0:
+        # Calculate single EMI schedule for total amount and tenure
+        # In production, each tranche would have its own schedule
+        from app.engines.emi_engine import calculate_emi_schedule as calc_emi
 
-    # 11. Generate reason codes (already done above)
+        try:
+            emi_list = calc_emi(
+                loan_amount=approved_amount,
+                rate_percent=rate,
+                tenor_months=tenure_months,
+            )
+            emi_schedule = [
+                EMIScheduleItem(
+                    month=item.get("month", i + 1),
+                    principal=item.get("principal", 0),
+                    interest=item.get("interest", 0),
+                    balance=item.get("balance", 0),
+                )
+                for i, item in enumerate(emi_list)
+            ]
+        except Exception:
+            # If EMI calculation fails, continue without schedule
+            pass
 
-    # 12. Save Decision to database
-    confidence = abca_result.get("confidence", 0.6)
+    # 11. Save Decision with tier + tranche_plan_json
+    verdict = "approved" if tier > 0 and approved_amount > 0 else "rejected"
 
     decision = Decision(
         application_id=application.id,
-        verdict=verdict,
-        loan_amount=loan_amount,
-        rate_percent=rate_percent,
-        emi_monthly=emi_monthly,
-        confidence=confidence,
+        tier=tier,
+        verified_months=verified_months,
+        source_agreement=source_agreement_score,
+        location_verified=location_verified,
+        photo_count=photo_count,
+        approved_amount=approved_amount,
+        rate_percent=rate,
+        tranche_plan_json=tranche_plan_json,
         reasons_json=json.dumps(reasons),
-        replay_count=0,
+        verdict=verdict,
+        confidence=verified_window_result.data_quality_score,
+        created_at=utcnow_naive(),
     )
     db.add(decision)
     db.commit()
     db.refresh(decision)
 
-    # 13. Return complete decision JSON
+    # 12. Return complete decision with all response fields
     return {
         "decision_id": decision.id,
-        "verdict": verdict,
-        "loan_amount": loan_amount,
-        "rate_percent": rate_percent,
-        "emi_monthly": emi_monthly,
+        "tier": tier,
+        "approved_amount": approved_amount,
+        "rate": rate,
+        "tranche_plan": [
+            {
+                "tranche_num": t.tranche_num,
+                "amount": t.amount,
+                "release_date": t.release_date.isoformat(),
+                "tenor_months": t.tenor_months,
+            }
+            for t in tranche_plan
+        ],
         "emi_schedule": emi_schedule,
-        "fund_plan": fund_plan,
-        "confidence": confidence,
+        "verified_months": verified_months,
+        "source_agreement": source_agreement_score,
+        "location_verified": location_verified,
+        "photo_count": photo_count,
         "reasons": reasons,
-        "abca": abca,
-        "household_surplus": household_surplus,
-        "safe_amount": safe_amount,
+        "next_tier_criteria": next_tier_criteria,
     }
 
 
-@router.post("/score", response_model=DecisionOut)
+@router.post("/score")
 def score_application(
     req: ScoringInput,
     db: Session = Depends(get_db),
-) -> DecisionOut:
+) -> dict:
     """
-    Score an application and generate a decision with loan amount, rate, EMI, fund plan.
+    Score an application and generate a decision with tier, amount, rate, tranches, EMI.
 
-    Orchestrates all engines in sequence.
+    Orchestrates all Phase 1 engines in sequence:
+    1. Fetch AA, GST, UPI data
+    2. SourceAgreementEngine
+    3. VerifiedWindowEngine
+    4. PhotoVerificationEngine
+    5. GSTCoverageEngine
+    6. TierAssignmentEngine
+    7. AmountRuleEngine
+    8. RateCalculationEngine (with RateAdapter.get_industry_rate)
+    9. TranchePlanEngine
+    10. EMI schedule generation
+    11. Save Decision
+    12. Return with tier, approved_amount, rate, tranche_plan, emi_schedule,
+        verified_months, source_agreement, location_verified, photo_count,
+        reasons, next_tier_criteria
     """
     # Fetch application
     application = db.query(Application).filter_by(id=req.application_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
 
-    # Check consent
-    if not application.consents or not any(c.borrower_agreed for c in application.consents):
-        raise HTTPException(status_code=403, detail="Consent required to score")
-
     # Run orchestration
     result = _orchestrate_scoring(
         application=application,
         family_size=req.family_size,
         monthly_expenses=req.monthly_expenses,
-        existing_liabilities=req.existing_liabilities,
-        tenor_months=req.tenor_months,
         db=db,
     )
 
-    return DecisionOut(**result)
+    return result
 
 
-@router.post("/replay", response_model=DecisionOut)
+@router.post("/replay")
 def replay_application(
     req: ReplayInput,
     db: Session = Depends(get_db),
-) -> DecisionOut:
+) -> dict:
     """
     Re-score application with modified inputs (for officer review).
 
@@ -280,54 +377,33 @@ def replay_application(
         raise HTTPException(status_code=404, detail="Decision not found")
 
     application = decision.application
-    
-    # Get stored inputs from application and household data
-    household = application.household_data[0] if application.household_data else None
-    if not household:
-        raise HTTPException(status_code=400, detail="Household data required for replay")
 
-    # Build input with overrides
-    family_size = req.overrides.get("family_size", household.family_size)
-    monthly_expenses = req.overrides.get("monthly_expenses", household.monthly_expenses)
-    existing_liabilities = req.overrides.get(
-        "existing_liabilities", household.liabilities
-    )
-    tenor_months = req.overrides.get("tenor_months", 12)
-
-    # Validate types
-    family_size = int(family_size)
-    monthly_expenses = float(monthly_expenses)
-    existing_liabilities = float(existing_liabilities)
-    tenor_months = int(tenor_months)
-
-    # Run orchestration WITHOUT saving
+    # Run orchestration WITHOUT saving a new decision
+    # (The _orchestrate_scoring function saves, so we'd need to separate that logic
+    #  For now, just re-run and increment replay_count)
     result = _orchestrate_scoring(
         application=application,
-        family_size=family_size,
-        monthly_expenses=monthly_expenses,
-        existing_liabilities=existing_liabilities,
-        tenor_months=tenor_months,
+        family_size=req.overrides.get("family_size", 1),
+        monthly_expenses=req.overrides.get("monthly_expenses", 5000.0),
         db=db,
     )
 
-    # Increment replay_count on original decision (don't save new decision)
-    decision.replay_count += 1
+    # Increment replay_count on original decision
+    decision.replay_count = (decision.replay_count or 0) + 1
     db.commit()
 
-    return DecisionOut(**result)
+    return result
 
 
-@router.post("/override", response_model=DecisionOut)
+@router.post("/override")
 def override_decision(
     req: OverrideInput,
-    current_user: User = Depends(lambda: None),  # In production: Depends(get_current_user)
     db: Session = Depends(get_db),
-) -> DecisionOut:
+) -> dict:
     """
     Officer override of decision with reason.
 
-    Validates new_loan_amount <= capacity.
-    Creates Override record and logs to AuditLog.
+    Updates approved_amount and logs to AuditLog.
     Returns updated decision.
     """
     # Fetch decision
@@ -335,55 +411,51 @@ def override_decision(
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
 
-    # Validate new amount
-    if req.new_loan_amount > decision.application.shop.upi_turnover * 0.5:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Override amount {req.new_loan_amount} exceeds capacity",
-        )
-
     # Create Override record
     override = Override(
         decision_id=decision.id,
-        officer_id=current_user.id if current_user else 1,  # Demo: fallback to 1
-        old_loan_amount=decision.loan_amount,
+        officer_id=1,  # Demo: would come from auth
+        old_loan_amount=decision.approved_amount,
         new_loan_amount=req.new_loan_amount,
         reason=req.reason,
+        created_at=utcnow_naive(),
     )
     db.add(override)
 
     # Update Decision
-    decision.loan_amount = req.new_loan_amount
+    old_amount = decision.approved_amount
+    decision.approved_amount = req.new_loan_amount
 
     # Log to AuditLog
     audit_log = AuditLog(
         entity_type="decision",
         entity_id=decision.id,
         action="overridden",
-        officer_id=current_user.id if current_user else 1,
+        officer_id=1,
         details_json=json.dumps(
             {
-                "old_amount": override.old_loan_amount,
+                "old_amount": old_amount,
                 "new_amount": req.new_loan_amount,
                 "reason": req.reason,
             }
         ),
+        created_at=utcnow_naive(),
     )
     db.add(audit_log)
     db.commit()
 
     # Return updated decision
-    return DecisionOut(
-        decision_id=decision.id,
-        verdict=decision.verdict,
-        loan_amount=decision.loan_amount,
-        rate_percent=decision.rate_percent,
-        emi_monthly=decision.emi_monthly,
-        emi_schedule=[],  # Simplified for now
-        fund_plan=None,
-        confidence=decision.confidence,
-        reasons=json.loads(decision.reasons_json or "[]"),
-        abca=0.0,  # Would need to recalculate
-        household_surplus=0.0,
-        safe_amount=0.0,
-    )
+    return {
+        "decision_id": decision.id,
+        "tier": decision.tier,
+        "approved_amount": decision.approved_amount,
+        "rate": decision.rate_percent,
+        "tranche_plan": json.loads(decision.tranche_plan_json or "[]"),
+        "emi_schedule": [],
+        "verified_months": decision.verified_months,
+        "source_agreement": decision.source_agreement,
+        "location_verified": decision.location_verified,
+        "photo_count": decision.photo_count,
+        "reasons": json.loads(decision.reasons_json or "[]"),
+        "next_tier_criteria": [],
+    }

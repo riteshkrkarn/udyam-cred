@@ -411,18 +411,15 @@ class Decision(Base):
     verdict = Column(String(32), nullable=False)  # approved | rejected
     tier = Column(Integer, nullable=True)
     verified_months = Column(Integer, nullable=True)
-    source_agreement_score = Column(Float, nullable=True)
+    source_agreement = Column(Float, nullable=True)  # Agreement score 0-1
     location_verified = Column(Boolean, nullable=True)
     photo_count = Column(Integer, nullable=True, default=0)
+    approved_amount = Column(Float, nullable=True)  # Approved loan amount
+    rate_percent = Column(Float, nullable=True)
     tranche_plan_json = Column(Text, nullable=True)  # JSON-serialized tranche plan
     reasons_json = Column(Text, nullable=True)  # JSON-serialized list of reasons
     replay_count = Column(Integer, nullable=False, default=0)
-    
-    # DEPRECATED: Old schema fields for backward compatibility. Use tier, verified_months, tranche_plan_json instead.
-    loan_amount = Column(Float, nullable=True)
-    rate_percent = Column(Float, nullable=True)
-    emi_monthly = Column(Float, nullable=True)
-    confidence = Column(Float, nullable=True)
+    confidence = Column(Float, nullable=True)  # Data quality score
     
     created_at = Column(DateTime, default=utcnow_naive, nullable=False)
 
