@@ -1,0 +1,101 @@
+﻿{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": "HIGH.1",
+      "severity": "HIGH",
+      "title": "Missing Tier-Driven Verified Months Logic in Tier Assignment Engine",
+      "location": "Design Section 1 (Backend Integration & Wiring), Engine Orchestration table; Requirements FR1.3",
+      "problem": "The design states 'Tier 1 requires 6+ verified months (AA+UPI with no GST)' but doesn't clarify the decision rule. If a borrower has 6+ verified months but the GST requirement is violated, the tier assignment logic is ambiguous (AND vs OR conditions).",
+      "impact": "Tier assignment logic ambiguous → Engineering guess at implementation → Potential mismatch with requirements",
+      "fix": "Clarify exact tier assignment logic with explicit AND/OR: Tier 1: verified_months >= 6 AND (AA_present OR UPI_present) AND NOT GST_registered. Tier 2: verified_months >= 12 AND (AA_present AND (GST_registered OR UPI_present)) AND NOT Udyam_registered. Tier 3: verified_months >= 24 AND AA_present AND GST_registered AND Udyam_registered. Define verified_months = min(aa_months, gst_months, upi_months) if multiple sources."
+    },
+    {
+      "id": "HIGH.2",
+      "severity": "HIGH",
+      "title": "PhotoVerificationEngine Not Invoked in Scoring Pipeline",
+      "location": "Design Section 1, Engine Orchestration step 3; Requirements FR1.6; Code: scoring_phase1.py, photos.py",
+      "problem": "Design describes PhotoVerificationEngine as step 3 in scoring pipeline, but code review shows photos.py saves photos without calling PhotoVerificationEngine, and scoring_phase1.py checks verification_status but never calls engine to perform verification. Photos remain stuck in 'pending' status.",
+      "impact": "Photos uploaded but never verified → Photo verification test fails → Integration test suite incomplete",
+      "fix": "Add new endpoint POST /api/applications/{id}/verify-photos that calls PhotoVerificationEngine for each photo and updates Photo.verification_status and Photo.verified_at. Or auto-verify during scoring. Include rent_lat/rent_lng in Shop model and challenge_code in Application model."
+    },
+    {
+      "id": "HIGH.3",
+      "severity": "HIGH",
+      "title": "RateCalculationEngine RateAdapter Not Wired; Hardcoded Rates Unclear",
+      "location": "Design Section 1, Engine Orchestration step 9; Code: scoring_phase1.py, rate_adapter.py",
+      "problem": "Design claims 'Fetch industry rate from RateAdapter by tier' but doesn't clarify whether rates are stored in RateEnvironment table or hardcoded. RateAdapter implementation and contract not fully specified in design.",
+      "impact": "Rates unclear (hardcoded vs. dynamic) → Confusion during rate engine wiring → Potential wrong rates in production",
+      "fix": "Define RateAdapter contract: get_rate(tier: int, db: Session) → {base_rate, adjustment, final_rate}. Clarify rate storage: RateEnvironment table or hardcoded? Verify RateCalculationEngine actually calls RateAdapter. Update error handling table to include 'Rate lookup fails' scenario."
+    },
+    {
+      "id": "HIGH.4",
+      "severity": "HIGH",
+      "title": "Missing Challenge Code Generation and Storage",
+      "location": "Requirements FR1.6 (Challenge code verification), Design Section 1 (PhotoVerificationEngine)",
+      "problem": "Design requires 'challenge code verification' but doesn't specify where code is generated, stored, or displayed to borrower. PhotoVerificationEngine expects expected_code parameter but design doesn't define its source.",
+      "impact": "Challenge codes never generated → Photo verification always fails → Borrowers can't complete application",
+      "fix": "Add Application.challenge_code column or Challenge table with code, created_at, expires_at. Add endpoint POST /api/applications/{id}/generate-challenge returning {code, expires_in_minutes}. Update PhotoVerificationEngine contract to show code generation step. Clarify timing: generate before or after photo upload?"
+    },
+    {
+      "id": "HIGH.5",
+      "severity": "HIGH",
+      "title": "Glossary Endpoint Not Defined; Plain Language Reasons Data Structure Unclear",
+      "location": "Design Section 2 (Frontend Integration), Plain Language Glossary table; Requirements FR1.7, AC1.7",
+      "problem": "Design lists 18 glossary terms but no GET /api/glossary endpoint documented in endpoint wiring table. No response schema defined. generate_plain_reasons() function called but not defined in design.",
+      "impact": "Glossary endpoint missing → Plain language reasons test fails → Borrowers see code names instead of plain English",
+      "fix": "Add endpoint GET /api/glossary in wiring table. Define response schema: {terms: {term_name: {plain_text, category, examples}}, version}. Document mapping between reason templates and glossary terms. Add test requirement: verify all 18 terms referenced in reason templates."
+    },
+    {
+      "id": "MEDIUM.1",
+      "severity": "MEDIUM",
+      "title": "TrancheRuleEngine Eligibility Check Missing Explicit Preconditions",
+      "location": "Design Section 1, Engine Orchestration; Requirements FR1.4",
+      "problem": "Design describes TrancheRuleEngine checking 'prior EMI history' but doesn't define: all prior tranches or just immediately prior? Definition of on-time (≤due_date or ≤due_date+grace_period)? Grace period value?",
+      "impact": "Tranche eligibility rule ambiguous → Wrong tranches released → Borrowers get unapproved amounts",
+      "fix": "Clarify TrancheRuleEngine logic: (1) Get previous tranche; (2) If no previous: ELIGIBLE; (3) If previous exists: check ALL EMIs have payment_status='ontime' (paid_date <= due_date); (4) If ANY late: NOT_ELIGIBLE; (5) If previous EMI count=0: NOT_ELIGIBLE. Define grace period explicitly (0 days recommended)."
+    },
+    {
+      "id": "MEDIUM.2",
+      "severity": "MEDIUM",
+      "title": "Load Test Configuration Incomplete; Missing Baseline Metrics",
+      "location": "Design Section 5 (Load Testing), Tests 1-4",
+      "problem": "Load test config lacks baseline metrics (1 concurrent user for comparison), database size specification, memory allocation justification, and pre-load warmup phase.",
+      "impact": "Metrics unreliable → Unsure if system handles 100 users",
+      "fix": "Add baseline (1 concurrent user, cold start): <500ms p95 response time, <300MB memory. Specify database generation: 10,000 apps with 2 tranches each, 24 EMIs per tranche = ~720k records. Add 30-second warmup phase before measuring. Document machine spec (2GB RAM assumption)."
+    },
+    {
+      "id": "NIT.1",
+      "severity": "NIT",
+      "title": "End-to-End Data Flow Diagram Incomplete",
+      "location": "Design Section 7 (Integration Points & Data Flow)",
+      "problem": "Data flow diagram shows happy path but doesn't show error/retry paths, timeout handling, or failure states.",
+      "impact": "Minor clarity issue",
+      "fix": "Optional: Add error flow paths (e.g., scoring timeout → 500 error → retry button)"
+    },
+    {
+      "id": "NIT.2",
+      "severity": "NIT",
+      "title": "Glossary Terms Category Mismatch Risk",
+      "location": "Design Section 2, Plain Language Glossary table",
+      "problem": "Glossary lists 18 terms in 6 categories, but frontend checklist might define different categories or counts.",
+      "impact": "Minor inconsistency",
+      "fix": "Optional: Cross-check glossary with frontend checklist to ensure alignment"
+    }
+  ],
+  "verified_assumptions": [
+    "A1: 9 Phase 1 Engines Implemented — All engine files exist with business logic",
+    "A2: StopRuleEngine Invoked on Repayment — Verified in repayment.py line ~73",
+    "A3: Database Schema Finalized — Decision model has correct fields",
+    "A4: Scoring Endpoint Wired — POST /api/scoring/score orchestrates engines 1-10",
+    "A5: Deterministic Adapters — All adapters return mock data with no randomness"
+  ],
+  "unverified_wrong_assumptions": [
+    "U1: PhotoVerificationEngine Invoked During Scoring — WRONG: Not actually called during scoring",
+    "U2: RateAdapter Fetches Industry Rates — UNVERIFIED: Contract and storage unclear",
+    "U3: Challenge Code Generation Implemented — WRONG: No generation/storage mechanism documented",
+    "U4: Glossary Endpoint Implemented — UNVERIFIED: Not in endpoint wiring table",
+    "U5: TrancheRuleEngine Eligibility Logic Fully Specified — UNVERIFIED: Exact criteria not formally defined"
+  ],
+  "summary": "Design document is comprehensive in structure but contains 5 critical gaps that must be resolved before implementation: (1) ambiguous tier assignment logic, (2) photo verification not invoked, (3) unclear rate adapter wiring, (4) missing challenge code workflow, (5) missing glossary endpoint. Two medium-severity issues affect testing reliability. Recommend addressing all HIGH and MEDIUM findings before engineering begins."
+}
