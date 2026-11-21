@@ -1,0 +1,271 @@
+.glossary-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.glossary-modal {
+  width: 100%;
+  max-width: 500px;
+  height: 100vh;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.glossary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 2px solid #eee;
+  flex-shrink: 0;
+}
+
+.glossary-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  color: #333;
+}
+
+.glossary-search {
+  padding: 1rem;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.glossary-categories {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-bottom: 1px solid #eee;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.category-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  color: #666;
+}
+
+.category-btn:hover {
+  border-color: #0066cc;
+  color: #0066cc;
+}
+
+.category-btn.active {
+  background: #0066cc;
+  color: white;
+  border-color: #0066cc;
+}
+
+.glossary-terms {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.glossary-item {
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.2s ease;
+}
+
+.glossary-item:hover {
+  background: #f9f9f9;
+}
+
+.glossary-item.expanded {
+  background: #f9f9f9;
+}
+
+.term-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.2s ease;
+}
+
+.term-header:hover {
+  background: #efefef;
+}
+
+.term-name {
+  flex: 1;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.category-badge {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  background: #e8f4f8;
+  color: #0066cc;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.expand-icon {
+  color: #999;
+  font-size: 0.7rem;
+  transition: transform 0.2s ease;
+}
+
+.term-content {
+  padding: 0 1rem 1rem 1rem;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.term-content p {
+  margin: 0.8rem 0;
+  line-height: 1.6;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.definition {
+  padding: 0.8rem;
+  background: #f0f8ff;
+  border-left: 3px solid #0066cc;
+  border-radius: 2px;
+}
+
+.example {
+  padding: 0.8rem;
+  background: #f0fff0;
+  border-left: 3px solid #228B22;
+  border-radius: 2px;
+  font-size: 0.85rem;
+  color: #333;
+}
+
+.related {
+  padding: 0.8rem;
+  background: #fff9e6;
+  border-left: 3px solid #FF8C00;
+  border-radius: 2px;
+  font-size: 0.85rem;
+}
+
+.related-link {
+  background: none;
+  border: none;
+  color: #0066cc;
+  cursor: pointer;
+  text-decoration: underline;
+  font-weight: 600;
+  padding: 0;
+  font-size: inherit;
+}
+
+.related-link:hover {
+  text-decoration: underline;
+  color: #0052a3;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .glossary-modal {
+    max-width: 100%;
+  }
+
+  .glossary-categories {
+    padding: 0.8rem 0.5rem;
+  }
+
+  .category-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+
+  .glossary-search {
+    padding: 0.8rem;
+  }
+}
