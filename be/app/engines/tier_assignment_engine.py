@@ -159,15 +159,23 @@ class TierAssignmentEngine:
             )
 
         # Check Tier 1 eligibility (default)
+        # Allow Tier 1 if: 6+ months verified, agreement > 0.7, photo verified
+        # Tier 1 is available even if GST is registered (fallback for unqualified Tier 2)
+        # but prefers unregistered (no GST = stronger Tier 1 signal)
         if (
             verified_months >= TierAssignmentEngine.TIER_POLICIES[1][
                 "min_verified_months"
             ]
-            and not gst_registered
-            and not udyam_registered
             and source_agreement_score
             >= TierAssignmentEngine.TIER_POLICIES[1]["min_agreement_score"]
             and photo_verified
+            and not udyam_registered  # Udyam is for Tier 3 only
+            and not (
+                gst_registered
+                and verified_months >= TierAssignmentEngine.TIER_POLICIES[2][
+                    "min_verified_months"
+                ]
+            )  # Don't allow Tier 1 if qualified for Tier 2
         ):
             reasons.append(
                 f"Verified {verified_months} months of bank data (requires 6+)"
@@ -175,12 +183,18 @@ class TierAssignmentEngine:
             reasons.append(
                 f"AA and UPI agree on sales {source_agreement_score * 100:.0f}%"
             )
-            reasons.append("Shop location verified with rent agreement")
+            if not gst_registered:
+                reasons.append("Shop location verified with rent agreement")
             reasons.append("Tier 1: Quick loan for emerging businesses")
 
-            next_tier_criteria.append(
-                "Register for GST to unlock Tier 2 (up to ₹2.5L)"
-            )
+            if gst_registered:
+                next_tier_criteria.append(
+                    "Accumulate 12+ months of verified data to unlock Tier 2 (up to ₹2.5L)"
+                )
+            else:
+                next_tier_criteria.append(
+                    "Register for GST to unlock Tier 2 (up to ₹2.5L)"
+                )
             next_tier_criteria.append("Maintain 6+ months of on-time repayment")
 
             return TierAssignmentResult(
@@ -201,9 +215,6 @@ class TierAssignmentEngine:
                 f"Only {verified_months} months of verified data (requires 6+)"
             )
             next_tier_criteria.append("Provide 6+ months of bank statement history")
-        elif gst_registered:
-            reasons.append("GST registered but insufficient months for Tier 2")
-            next_tier_criteria.append("Accumulate 12+ months of verified data to qualify for Tier 2")
         elif source_agreement_score < 0.65:
             reasons.append(
                 f"Sales sources only agree {source_agreement_score * 100:.0f}% (requires 65%+)"
@@ -212,6 +223,8 @@ class TierAssignmentEngine:
         elif not photo_verified:
             reasons.append("Shop location could not be verified")
             next_tier_criteria.append("Provide clear geo-tagged photo of shop")
+        else:
+            reasons.append("Does not meet criteria for current tier assignment")
 
         return TierAssignmentResult(
             tier=0,  # Rejected
