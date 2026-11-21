@@ -180,3 +180,220 @@ dialog .actions { margin-top: .5rem; }
   .top nav { display: none; flex-direction: column; gap: .8rem; flex-basis: 100%; order: 3; }
   .top nav.open { display: flex; }
 }
+
+/* Header improvements & demo buttons */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brand-icon {
+  font-size: 1.8rem;
+  display: inline-block;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
+}
+
+.demo-buttons {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn.demo-borrower,
+.btn.demo-officer,
+.btn.demo-case {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: var(--sheet);
+  font-size: 13px;
+  padding: 0.6rem 1rem;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn.demo-borrower:hover {
+  background: rgba(242, 180, 76, 0.9);
+  border-color: var(--haldi);
+  color: var(--ink);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn.demo-officer:hover {
+  background: rgba(47, 107, 79, 0.9);
+  border-color: var(--ok);
+  color: var(--sheet);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn.demo-case:hover {
+  background: rgba(196, 138, 31, 0.9);
+  border-color: var(--haldi);
+  color: var(--ink);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn.demo-borrower::before {
+  content: "📱";
+  margin-right: 0.4rem;
+}
+
+.btn.demo-officer::before {
+  content: "👨‍💼";
+  margin-right: 0.4rem;
+}
+
+.btn.demo-case::before {
+  content: "📋";
+  margin-right: 0.4rem;
+}
+
+/* Update menu button styling */
+.menu-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--sheet);
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.menu-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .demo-buttons {
+    gap: 0.5rem;
+  }
+
+  .btn.demo-borrower,
+  .btn.demo-officer,
+  .btn.demo-case {
+    padding: 0.5rem 0.8rem;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .demo-buttons {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .btn.demo-borrower,
+  .btn.demo-officer,
+  .btn.demo-case {
+    flex: 1;
+    min-width: 120px;
+    padding: 0.6rem 0.8rem;
+  }
+
+  .top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .top nav {
+    flex-basis: 100% !important;
+    order: 2;
+  }
+
+  .menu-btn {
+    order: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .demo-buttons {
+    flex-direction: column;
+  }
+
+  .btn.demo-borrower,
+  .btn.demo-officer,
+  .btn.demo-case {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .header-left .brand {
+    font-size: 1.2rem;
+  }
+
+  .brand-icon {
+    font-size: 1.4rem;
+  }
+}
+
+
+/* Additional header styling for demo buttons */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-icon {
+  font-size: 1.5rem;
+  display: inline-block;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-left: auto;
+}
+
+.demo-buttons {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .top {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+  }
+
+  .header-left {
+    flex-basis: auto;
+  }
+
+  .menu-btn {
+    margin-left: auto;
+  }
+
+  .top nav {
+    flex-basis: 100%;
+  }
+
+  .header-actions {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}

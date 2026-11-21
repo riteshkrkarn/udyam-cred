@@ -93,11 +93,61 @@ export default function CaseView() {
   async function loadCaseData() {
     try {
       setLoading(true)
-      // TODO: Replace with API call
-      // const response = await fetch(`/api/applications/${applicationId}`)
-      // const data = await response.json()
 
-      // Mock data for development
+      // Try real backend first
+      try {
+        const { bank: bankApi } = await import('../../api/client')
+        const [caseResp, decisionResp] = await Promise.all([
+          bankApi.caseDetail(applicationId!),
+          bankApi.decision(applicationId!),
+        ])
+        // Map backend shape → local shape
+        const mockData: CaseData = {
+          application_id: String(caseResp.application_id),
+          borrower_name: `Application #${caseResp.application_id}`,
+          borrower_phone: '—',
+          created_at: new Date().toISOString(),
+          decision: {
+            decision_id: String(caseResp.application_id),
+            tier: caseResp.tier,
+            approved_amount: decisionResp.amount,
+            rate_percent: decisionResp.rate_percent,
+            verified_months: caseResp.bank_inflows_months,
+            source_agreement_score: caseResp.confidence,
+            location_verified: false,
+            photo_count: caseResp.photos_count,
+            reasons: decisionResp.reasons,
+            next_tier_criteria: ['Provide GST registration to reach next tier.'],
+            tranche_plan: Object.entries(decisionResp.tranche_plan).map(([k, v], i) => ({
+              tranche_num: i + 1,
+              amount: v.amount,
+              release_date: new Date().toISOString(),
+              status: 'pending' as const,
+            })),
+            emi_schedule: [],
+          },
+          photos: [],
+          source_agreement: {
+            weighted_sales: decisionResp.amount,
+            aa_weight: 0.6,
+            gst_weight: 0.3,
+            upi_weight: 0.1,
+            agreement_score: caseResp.confidence,
+            sources_used: ['aa', 'upi'],
+            confidence: caseResp.confidence > 0.8 ? 'high' : caseResp.confidence > 0.6 ? 'medium' : 'low',
+          },
+          documents: Array.from({ length: caseResp.documents_count }, (_, i) => ({
+            name: `Document ${i + 1}`,
+            status: 'uploaded',
+          })),
+        }
+        setCaseData(mockData)
+        return
+      } catch (_backendError) {
+        // Backend unavailable — fall through to mock data
+      }
+
+      // Mock data for demo / offline mode
       const mockData: CaseData = {
         application_id: applicationId || 'app_001',
         borrower_name: 'Rajesh Kumar',
