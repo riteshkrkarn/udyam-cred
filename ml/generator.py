@@ -10,6 +10,12 @@ Architecture:
 3. Derived fields: purchases, stock, GST, deposits
 4. Injected anomalies: round-trips, sales inflation, vintage disagreements
 5. Labels: default probability and safe EMI
+6. Phase 1-2: Tier assignments, source data (AA, GST, UPI), verified windows, photos
+
+Phase 1-2 Tier System:
+- Tier 1: 6-12mo bank data, no GST, no Udyam → amounts ≤50k
+- Tier 2: 12+ mo bank + GST → amounts ≤250k
+- Tier 3: 24+ mo + Udyam + prior repayment → amounts ≤1M
 """
 
 import numpy as np
@@ -19,11 +25,19 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
+from enum import Enum
 
 from generator_config import GeneratorConfig, get_config
 
 
 logger = logging.getLogger(__name__)
+
+
+class Tier(Enum):
+    """Product tier based on verified evidence."""
+    TIER_1 = 1  # Bank data only, ≤50k
+    TIER_2 = 2  # Bank + GST, ≤250k
+    TIER_3 = 3  # Bank + GST + Udyam + repayment history, ≤1M
 
 
 @dataclass
@@ -38,6 +52,14 @@ class ShopMetadata:
     has_sales_inflation: bool
     has_vintage_disagreement: bool
     has_supplier_mismatch: bool
+    # Phase 1-2 fields
+    tier: Tier
+    verified_months: int  # Months where AA + (GST or UPI) available
+    source_agreement_score: float  # 0.6-0.95 correlation between sources
+    location_verified: bool
+    has_gst: bool
+    has_udyam: bool
+    has_prior_repayment: bool
 
 
 class SyntheticDataGenerator:
@@ -58,13 +80,15 @@ class SyntheticDataGenerator:
         self.shop_metadata: Dict[str, ShopMetadata] = {}
         
     def generate(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
+                                pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame,
                                 pd.DataFrame, pd.DataFrame, pd.DataFrame, Dict[str, ShopMetadata]]:
         """
-        Generate all tables.
+        Generate all tables including Phase 1-2 tier system.
         
         Returns:
             Tuple of (shops, monthly_flows, purchases, stock_snapshots, 
-                     vintage_signals, transfers, labels, metadata)
+                     vintage_signals, transfers, labels, tier_assignments,
+                     source_data, verified_windows, photos, metadata)
         """
         logger.info(f"Generating dataset with config: generator_id={self.config.generator_id}, "
                    f"n_shops={self.config.n_shops}, seed={self.config.seed}")
@@ -76,6 +100,18 @@ class SyntheticDataGenerator:
         monthly_flows_df, purchases_df, stock_snapshots_df, transfers_df = \
             self._generate_monthly_data(shops_df)
         
+        # Generate source data (AA, GST, UPI) - Phase 1-2
+        source_data_df = self._generate_source_data(shops_df, monthly_flows_df)
+        
+        # Calculate verified windows (Phase 1-2) - this updates metadata
+        verified_windows_df = self._calculate_verified_windows(source_data_df, shops_df)
+        
+        # Assign tiers with updated metadata (Phase 1-2)
+        tier_assignments_df = self._assign_tiers(shops_df)
+        
+        # Generate photo metadata (Phase 1-2)
+        photos_df = self._generate_photos(shops_df)
+        
         # Generate vintage signals
         vintage_signals_df = self._generate_vintage_signals(shops_df)
         
@@ -84,12 +120,16 @@ class SyntheticDataGenerator:
         
         logger.info(f"Generated {len(shops_df)} shops with {len(monthly_flows_df)} monthly rows")
         logger.info(f"Default rate: {labels_df['default_6m'].mean():.2%}")
+        logger.info(f"Tier distribution: T1={sum(m.tier == Tier.TIER_1 for m in self.shop_metadata.values())}, "
+                   f"T2={sum(m.tier == Tier.TIER_2 for m in self.shop_metadata.values())}, "
+                   f"T3={sum(m.tier == Tier.TIER_3 for m in self.shop_metadata.values())}")
         logger.info(f"Anomalies - Roundtrip: {sum(m.has_roundtrip for m in self.shop_metadata.values())}, "
                    f"Sales inflation: {sum(m.has_sales_inflation for m in self.shop_metadata.values())}, "
                    f"Vintage disagreement: {sum(m.has_vintage_disagreement for m in self.shop_metadata.values())}")
         
         return (shops_df, monthly_flows_df, purchases_df, stock_snapshots_df, 
-                vintage_signals_df, transfers_df, labels_df, self.shop_metadata)
+                vintage_signals_df, transfers_df, labels_df, tier_assignments_df,
+                source_data_df, verified_windows_df, photos_df, self.shop_metadata)
     
     def _generate_shops(self) -> pd.DataFrame:
         """Generate shop base data."""
@@ -150,6 +190,25 @@ class SyntheticDataGenerator:
                 'synthetic': True,
             })
             
+            # Phase 1-2: Determine data sources
+            # Distribution: 30% Tier 1, 50% Tier 2, 20% Tier 3
+            tier_rand = self.rng.rand()
+            if tier_rand < 0.30:
+                tier = Tier.TIER_1
+                has_gst = False
+                has_udyam = False
+                has_prior_repayment = False
+            elif tier_rand < 0.80:
+                tier = Tier.TIER_2
+                has_gst = True
+                has_udyam = False
+                has_prior_repayment = False
+            else:
+                tier = Tier.TIER_3
+                has_gst = True
+                has_udyam = True
+                has_prior_repayment = True
+            
             # Store metadata
             self.shop_metadata[shop_id] = ShopMetadata(
                 shop_id=shop_id,
@@ -161,6 +220,14 @@ class SyntheticDataGenerator:
                 has_sales_inflation=self.rng.rand() < self.config.sales_inflation_rate,
                 has_vintage_disagreement=self.rng.rand() < self.config.vintage_disagreement_rate,
                 has_supplier_mismatch=self.rng.rand() < self.config.supplier_mismatch_rate,
+                # Phase 1-2
+                tier=tier,
+                verified_months=0,  # Will be calculated later
+                source_agreement_score=0.0,  # Will be calculated later
+                location_verified=self.rng.rand() > 0.1,  # 90% have verified location
+                has_gst=has_gst,
+                has_udyam=has_udyam,
+                has_prior_repayment=has_prior_repayment,
             )
         
         return pd.DataFrame(shops)
@@ -377,6 +444,227 @@ class SyntheticDataGenerator:
         
         return transfers
     
+    def _assign_tiers(self, shops_df: pd.DataFrame) -> pd.DataFrame:
+        """Assign tiers based on metadata."""
+        tier_assignments = []
+        
+        for shop_id, metadata in self.shop_metadata.items():
+            tier_assignments.append({
+                'shop_id': shop_id,
+                'tier': metadata.tier.value,
+                'has_gst': metadata.has_gst,
+                'has_udyam': metadata.has_udyam,
+                'has_prior_repayment': metadata.has_prior_repayment,
+                'verified_months': metadata.verified_months,
+                'source_agreement_score': metadata.source_agreement_score,
+            })
+        
+        return pd.DataFrame(tier_assignments)
+    
+    def _generate_source_data(self, shops_df: pd.DataFrame, monthly_flows_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Generate source data (AA, GST, UPI flows) with realistic overlaps.
+        
+        - Tier 1: AA + UPI for 6-12 months, no GST
+        - Tier 2: AA + GST + UPI for 12-24 months
+        - Tier 3: AA + GST + UPI for 24+ months
+        """
+        source_data_list = []
+        
+        for _, flow_row in monthly_flows_df.iterrows():
+            shop_id = flow_row['shop_id']
+            metadata = self.shop_metadata[shop_id]
+            month = flow_row['month']
+            
+            # Parse month to get ordinal position
+            month_date = pd.to_datetime(month)
+            
+            # Determine data availability based on tier and hidden health
+            # Healthier shops have more complete data
+            health = metadata.health_score
+            data_completeness = 0.85 + health * 0.15
+            
+            # AA (bank) flow - always available if shop started banking
+            aa_flow = flow_row['upi_inflow'] if self.rng.rand() < data_completeness else None
+            
+            # GST flow - only for Tier 2 and 3
+            if metadata.has_gst and self.rng.rand() < data_completeness:
+                gst_flow = flow_row['gst_turnover']
+            else:
+                gst_flow = None
+            
+            # UPI flow - always available for shops with UPI
+            upi_flow = flow_row['upi_inflow'] if self.rng.rand() < (0.95 + health * 0.05) else None
+            
+            source_data_list.append({
+                'shop_id': shop_id,
+                'month': month,
+                'aa_flow': aa_flow,
+                'gst_flow': gst_flow,
+                'upi_flow': upi_flow,
+                'tier': metadata.tier.value,
+            })
+        
+        return pd.DataFrame(source_data_list)
+    
+    def _calculate_verified_windows(self, source_data_df: pd.DataFrame, shops_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate verified windows (months where AA + (GST or UPI) available).
+        Also calculate source agreement scores.
+        
+        Verified window = months where:
+        - AA is available AND
+        - (GST is available OR UPI is available)
+        """
+        verified_windows_list = []
+        
+        for shop_id in source_data_df['shop_id'].unique():
+            shop_source = source_data_df[source_data_df['shop_id'] == shop_id].copy()
+            metadata = self.shop_metadata[shop_id]
+            
+            # Count verified months (AA + (GST or UPI))
+            shop_source['has_aa'] = shop_source['aa_flow'].notna()
+            shop_source['has_gst'] = shop_source['gst_flow'].notna()
+            shop_source['has_upi'] = shop_source['upi_flow'].notna()
+            shop_source['verified'] = (
+                shop_source['has_aa'] & (shop_source['has_gst'] | shop_source['has_upi'])
+            )
+            
+            verified_months = shop_source['verified'].sum()
+            
+            # Calculate source agreement score (correlation between overlapping sources)
+            # For months where 2+ sources exist, calculate correlation
+            overlapping = shop_source[
+                (shop_source['has_aa']) & 
+                ((shop_source['has_gst']) | (shop_source['has_upi']))
+            ]
+            
+            if len(overlapping) > 0:
+                # Normalize flows for comparison
+                aa_norm = overlapping['aa_flow'].fillna(0)
+                gst_norm = overlapping['gst_flow'].fillna(0)
+                upi_norm = overlapping['upi_flow'].fillna(0)
+                
+                # Calculate pairwise correlations if both sources available
+                correlations = []
+                
+                if (aa_norm > 0).sum() > 0 and (gst_norm > 0).sum() > 0:
+                    corr = np.corrcoef(aa_norm + 1, gst_norm + 1)[0, 1]
+                    if not np.isnan(corr):
+                        correlations.append(corr)
+                
+                if (aa_norm > 0).sum() > 0 and (upi_norm > 0).sum() > 0:
+                    corr = np.corrcoef(aa_norm + 1, upi_norm + 1)[0, 1]
+                    if not np.isnan(corr):
+                        correlations.append(corr)
+                
+                if (gst_norm > 0).sum() > 0 and (upi_norm > 0).sum() > 0:
+                    corr = np.corrcoef(gst_norm + 1, upi_norm + 1)[0, 1]
+                    if not np.isnan(corr):
+                        correlations.append(corr)
+                
+                # Source agreement score = average correlation, normalized to 0.6-0.95 range
+                if correlations:
+                    avg_corr = np.mean(correlations)
+                    # Map from [-1, 1] to [0.6, 0.95]
+                    source_agreement = 0.775 + (avg_corr * 0.175)
+                else:
+                    source_agreement = 0.75
+            else:
+                source_agreement = 0.6
+            
+            # Update metadata
+            self.shop_metadata[shop_id].verified_months = int(verified_months)
+            self.shop_metadata[shop_id].source_agreement_score = np.clip(source_agreement, 0.6, 0.95)
+            
+            # Calculate window start/end dates
+            verified_rows = shop_source[shop_source['verified']]
+            if len(verified_rows) > 0:
+                window_start = verified_rows.iloc[0]['month']
+                window_end = verified_rows.iloc[-1]['month']
+            else:
+                window_start = None
+                window_end = None
+            
+            verified_windows_list.append({
+                'shop_id': shop_id,
+                'window_start': window_start,
+                'window_end': window_end,
+                'months_verified': int(verified_months),
+                'agreement_score': self.shop_metadata[shop_id].source_agreement_score,
+                'tier': metadata.tier.value,
+            })
+        
+        return pd.DataFrame(verified_windows_list)
+    
+    def _generate_photos(self, shops_df: pd.DataFrame) -> pd.DataFrame:
+        """Generate photo metadata with locations and verification status."""
+        photos_list = []
+        
+        PHOTO_TYPES = ['exterior', 'signboard', 'interior', 'shop_front', 'bill_board']
+        
+        for _, shop_row in shops_df.iterrows():
+            shop_id = shop_row['shop_id']
+            metadata = self.shop_metadata[shop_id]
+            
+            # Photos per shop: 3-5
+            n_photos = int(self.rng.uniform(3, 6))
+            
+            for photo_num in range(n_photos):
+                # Location: shop_size determines area
+                # Use deterministic location based on city + shop_id
+                city_lat_map = {
+                    'bangalore': 12.97,
+                    'hyderabad': 17.37,
+                    'delhi': 28.70,
+                    'mumbai': 19.08,
+                    'pune': 18.52,
+                    'chennai': 13.09,
+                    'kolkata': 22.57,
+                    'ahmedabad': 23.03,
+                    'lucknow': 26.85,
+                    'indore': 22.72,
+                }
+                
+                base_lat = city_lat_map.get(shop_row['city'], 20.0)
+                # Longitude mapping for cities
+                city_lng_map = {
+                    'bangalore': 77.60,
+                    'hyderabad': 78.48,
+                    'delhi': 77.20,
+                    'mumbai': 72.88,
+                    'pune': 73.85,
+                    'chennai': 80.28,
+                    'kolkata': 88.36,
+                    'ahmedabad': 72.58,
+                    'lucknow': 80.95,
+                    'indore': 75.86,
+                }
+                base_lng = city_lng_map.get(shop_row['city'], 77.0)
+                
+                # Add noise for specific shop location
+                lat = base_lat + self.rng.uniform(-0.1, 0.1)
+                lng = base_lng + self.rng.uniform(-0.1, 0.1)
+                
+                # Timestamp: random within last 90 days
+                days_ago = int(self.rng.uniform(0, 90))
+                timestamp = (datetime.now() - timedelta(days=days_ago)).isoformat()
+                
+                photo_type = self.rng.choice(PHOTO_TYPES)
+                verified = 1 if metadata.location_verified and self.rng.rand() > 0.05 else 0
+                
+                photos_list.append({
+                    'shop_id': shop_id,
+                    'photo_num': photo_num + 1,
+                    'photo_type': photo_type,
+                    'location_lat': lat,
+                    'location_lng': lng,
+                    'timestamp': timestamp,
+                    'verified': verified,
+                })
+        
+        return pd.DataFrame(photos_list)
+    
     def _generate_vintage_signals(self, shops_df: pd.DataFrame) -> pd.DataFrame:
         """Generate vintage signals (multiple date sources)."""
         vintage_signals = []
@@ -456,7 +744,8 @@ def generate_and_save(generator_id: int, output_dir: str = 'ml/data') -> None:
     config = get_config(generator_id)
     generator = SyntheticDataGenerator(config)
     
-    shops, monthly_flows, purchases, stock_snapshots, vintage_signals, transfers, labels, metadata = generator.generate()
+    (shops, monthly_flows, purchases, stock_snapshots, vintage_signals, transfers, labels, 
+     tier_assignments, source_data, verified_windows, photos, metadata) = generator.generate()
     
     # Create output directory
     output_path = Path(output_dir)
@@ -470,6 +759,12 @@ def generate_and_save(generator_id: int, output_dir: str = 'ml/data') -> None:
     vintage_signals.to_csv(output_path / f'vintage_signals_gen{generator_id}.csv', index=False)
     transfers.to_csv(output_path / f'transfers_gen{generator_id}.csv', index=False)
     labels.to_csv(output_path / f'labels_gen{generator_id}.csv', index=False)
+    
+    # Phase 1-2 outputs
+    tier_assignments.to_csv(output_path / f'tier_assignments_gen{generator_id}.csv', index=False)
+    source_data.to_csv(output_path / f'source_data_gen{generator_id}.csv', index=False)
+    verified_windows.to_csv(output_path / f'verified_windows_gen{generator_id}.csv', index=False)
+    photos.to_csv(output_path / f'photos_gen{generator_id}.csv', index=False)
     
     # Save config
     config.to_json(output_path / f'config_gen{generator_id}.json')
@@ -485,7 +780,31 @@ def generate_and_save(generator_id: int, output_dir: str = 'ml/data') -> None:
     print(f"Transfers: {len(transfers)}")
     print(f"\nDefault rate: {labels['default_6m'].mean():.2%}")
     print(f"Thin-history shops: {(monthly_flows.groupby('shop_id').size() < 12).sum()}")
-    print(f"Anomalies:")
+    
+    # Phase 1-2 stats
+    print(f"\n=== PHASE 1-2 STATS ===")
+    tier_dist = tier_assignments['tier'].value_counts().sort_index()
+    total_shops = len(tier_assignments)
+    print(f"Tier distribution:")
+    for tier_num in [1, 2, 3]:
+        count = tier_dist.get(tier_num, 0)
+        pct = (count / total_shops) * 100
+        print(f"  Tier {tier_num}: {count} ({pct:.1f}%)")
+    
+    print(f"\nSource agreement scores:")
+    print(f"  Mean: {verified_windows['agreement_score'].mean():.3f}")
+    print(f"  Min: {verified_windows['agreement_score'].min():.3f}")
+    print(f"  Max: {verified_windows['agreement_score'].max():.3f}")
+    
+    print(f"\nVerified months:")
+    print(f"  Mean: {verified_windows['months_verified'].mean():.1f}")
+    print(f"  Median: {verified_windows['months_verified'].median():.1f}")
+    
+    print(f"\nPhotos:")
+    print(f"  Total photos: {len(photos)}")
+    print(f"  Verified: {photos['verified'].sum()} ({(photos['verified'].mean() * 100):.1f}%)")
+    
+    print(f"\nAnomalies:")
     print(f"  Round-trip: {sum(1 for m in metadata.values() if m.has_roundtrip)} shops")
     print(f"  Sales inflation: {sum(1 for m in metadata.values() if m.has_sales_inflation)} shops")
     print(f"  Vintage disagreement: {sum(1 for m in metadata.values() if m.has_vintage_disagreement)} shops")
