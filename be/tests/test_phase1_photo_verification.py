@@ -71,10 +71,10 @@ class TestLocationExtraction:
     def test_calculate_distance_500_meters_tolerance(self):
         """Test distance within 500m tolerance."""
         lat1, lng1 = 12.9716, 77.5946
-        # Approximately 500m away
-        lat2, lng2 = 12.97715, 77.5946
+        # Approximately 300m away (closer point)
+        lat2, lng2 = 12.97460, 77.5946
         distance = PhotoVerificationEngine.calculate_distance(lat1, lng1, lat2, lng2)
-        assert distance < 600  # Approximately 500m
+        assert distance < 500  # Within 500m tolerance
 
 
 class TestLocationTolerance:

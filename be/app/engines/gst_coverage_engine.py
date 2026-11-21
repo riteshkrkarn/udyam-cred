@@ -20,26 +20,26 @@ class GSTCoverageEngine:
 
     @staticmethod
     def check_coverage(
-        purchases_from_bills: float, gst_turnover: float
+        purchases_declared: float, gst_turnover: float
     ) -> GSTCoverageResult:
         """
         Compare purchases from bills to GST turnover.
 
         Args:
-            purchases_from_bills: Total purchases declared on bills (cost of goods)
+            purchases_declared: Total purchases declared on bills (cost of goods)
             gst_turnover: Total turnover from GST filings (selling price)
 
         Returns:
             GSTCoverageResult with coverage metrics
         """
-        if purchases_from_bills <= 0 or gst_turnover <= 0:
+        if purchases_declared <= 0 or gst_turnover <= 0:
             return GSTCoverageResult(
                 coverage_percent=0.0,
                 reconciliation_flag=True,
                 notes="Invalid purchases or GST turnover values",
             )
 
-        coverage = gst_turnover / purchases_from_bills
+        coverage = gst_turnover / purchases_declared
 
         # Determine if flag is needed
         reconciliation_flag = False
@@ -49,12 +49,12 @@ class GSTCoverageEngine:
             reconciliation_flag = True
             notes = (
                 f"GST turnover ({gst_turnover:.0f}) is significantly lower than purchases "
-                f"({purchases_from_bills:.0f}). Possible underdeclaration or incomplete GST filings."
+                f"({purchases_declared:.0f}). Possible underdeclaration or incomplete GST filings."
             )
         elif coverage > GSTCoverageEngine.UPPER_THRESHOLD:
             reconciliation_flag = True
             notes = (
-                f"GST turnover ({gst_turnover:.0f}) exceeds purchases ({purchases_from_bills:.0f}). "
+                f"GST turnover ({gst_turnover:.0f}) exceeds purchases ({purchases_declared:.0f}). "
                 f"Possible bill inflation or GST overstating."
             )
         else:
@@ -70,16 +70,16 @@ class GSTCoverageEngine:
 
     @staticmethod
     def verify_coverage(
-        purchases_from_bills: float, gst_turnover: float
+        purchases_declared: float, gst_turnover: float
     ) -> GSTCoverageResult:
         """
         Alias for check_coverage. Verify GST coverage.
 
         Args:
-            purchases_from_bills: Total purchases declared on bills (cost of goods)
+            purchases_declared: Total purchases declared on bills (cost of goods)
             gst_turnover: Total turnover from GST filings (selling price)
 
         Returns:
             GSTCoverageResult with coverage metrics
         """
-        return GSTCoverageEngine.check_coverage(purchases_from_bills, gst_turnover)
+        return GSTCoverageEngine.check_coverage(purchases_declared, gst_turnover)

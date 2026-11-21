@@ -32,6 +32,10 @@ from app.models import (
     User,
 )
 from app.schemas import Phase1DecisionOut, ScoringPhase1Input, TrancheDetailOut, EMIScheduleItem
+from app.templates.reasons import (
+    generate_plain_reasons,
+    generate_next_tier_criteria,
+)
 from app.utils import utcnow_naive
 
 router = APIRouter(prefix="/api/scoring", tags=["scoring-phase1"])
@@ -303,8 +307,23 @@ def score_application(
         prior_repayment_history=None,
     )
 
-    reasons.extend(tier_result.reasons)
-    next_tier_criteria.extend(tier_result.next_tier_criteria)
+    # Generate plain-language reasons for borrower
+    decision_data = {
+        "tier": tier_result.tier,
+        "verdict": "approved" if tier_result.tier > 0 else "rejected",
+        "verified_months": verified_window_result.months_verified,
+        "source_agreement_score": source_agreement_result.agreement_score,
+        "photo_verified": photo_verified,
+        "location_verified": location_verified,
+        "gst_registered": gst_registered,
+        "gst_coverage": gst_coverage_result.coverage_percent if gst_coverage_result else 0.0,
+        "udyam_registered": udyam_registered,
+        "prior_repayment_history": None,
+        "sources_used": list(source_agreement_result.sources_used),
+    }
+    
+    reasons = generate_plain_reasons(decision_data)
+    next_tier_criteria = generate_next_tier_criteria(decision_data)
 
     # If rejected
     if tier_result.tier == 0:

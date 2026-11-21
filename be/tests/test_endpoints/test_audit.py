@@ -107,7 +107,8 @@ class TestAuditDecisionList:
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
             replay_count=0,
@@ -171,14 +172,16 @@ class TestAuditDecisionList:
         dec1 = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
         )
         dec2 = Decision(
             application_id=app2.id,
             verdict="approved",
-            loan_amount=60000,
+            tier=2,
+            approved_amount=60000,
             confidence=0.80,
             reasons_json=json.dumps(["good"]),
         )
@@ -190,7 +193,7 @@ class TestAuditDecisionList:
             application_id=test_application.id
         ).all()
         assert len(decisions) == 1
-        assert decisions[0].loan_amount == 50000
+        assert decisions[0].approved_amount == 50000
 
     def test_filter_by_date_range(self, db_session: Session, test_application):
         """Test filtering decisions by date range."""
@@ -201,7 +204,8 @@ class TestAuditDecisionList:
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
         )
@@ -240,7 +244,8 @@ class TestAuditTrail:
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
         )
@@ -269,7 +274,8 @@ class TestAuditTrail:
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
         )

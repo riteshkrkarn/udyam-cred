@@ -91,9 +91,9 @@ class TestScoringCreate:
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             rate_percent=12.5,
-            emi_monthly=4500,
             confidence=0.85,
             reasons_json=json.dumps(["stable_cash_flow", "good_vintage"]),
             replay_count=0,
@@ -104,7 +104,7 @@ class TestScoringCreate:
 
         assert decision.id is not None
         assert decision.verdict == "approved"
-        assert decision.loan_amount == 50000
+        assert decision.approved_amount == 50000
 
     def test_score_requires_consent(self, db_session: Session, test_user, test_shop):
         """Test that scoring fails without consent."""
@@ -130,7 +130,7 @@ class TestScoringCreate:
         decision = Decision(
             application_id=test_application.id,
             verdict="rejected",
-            loan_amount=0,
+            approved_amount=0,
             confidence=0.6,
             reasons_json=json.dumps(["insufficient_capacity"]),
         )
@@ -141,7 +141,7 @@ class TestScoringCreate:
             application_id=test_application.id
         ).first()
         assert retrieved.verdict == "rejected"
-        assert retrieved.loan_amount == 0
+        assert retrieved.approved_amount == 0
 
 
 class TestReplay:
@@ -152,7 +152,8 @@ class TestReplay:
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
             replay_count=0,
@@ -189,7 +190,8 @@ class TestReplay:
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=40000,  # Lower due to higher expenses
+            tier=1,
+            approved_amount=40000,  # Lower due to higher expenses
             confidence=0.75,
             reasons_json=json.dumps(["adjusted"]),
         )
@@ -213,7 +215,8 @@ class TestOverride:
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
         )
@@ -237,11 +240,12 @@ class TestOverride:
         assert override.new_loan_amount == 40000
 
     def test_override_updates_decision(self, db_session: Session, test_user, test_application):
-        """Test that override updates the decision's loan_amount."""
+        """Test that override updates the decision's approved_amount."""
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
         )
@@ -252,25 +256,26 @@ class TestOverride:
         override = Override(
             decision_id=decision.id,
             officer_id=test_user.id,
-            old_loan_amount=decision.loan_amount,
+            old_loan_amount=decision.approved_amount,
             new_loan_amount=40000,
             reason="Conservative",
         )
         db_session.add(override)
-        decision.loan_amount = 40000
+        decision.approved_amount = 40000
         db_session.commit()
 
         retrieved_decision = db_session.query(Decision).filter_by(
             id=decision.id
         ).first()
-        assert retrieved_decision.loan_amount == 40000
+        assert retrieved_decision.approved_amount == 40000
 
     def test_override_with_reason(self, db_session: Session, test_user, test_application):
         """Test that override reason is captured."""
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
         )
@@ -298,7 +303,8 @@ class TestOverride:
         decision = Decision(
             application_id=test_application.id,
             verdict="approved",
-            loan_amount=50000,
+            tier=1,
+            approved_amount=50000,
             confidence=0.85,
             reasons_json=json.dumps(["stable"]),
         )

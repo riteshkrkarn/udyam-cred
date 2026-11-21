@@ -78,7 +78,7 @@ class SourceAgreementEngine:
         variance = sum((x - avg) ** 2 for x in all_sources) / len(all_sources)
         std_dev = variance ** 0.5
         cv = std_dev / avg if avg > 0 else 1.0
-        # CV < 0.1 = high agreement (0.95), CV < 0.2 = medium (0.8), else lower
+        # CV < 0.1 = high agreement (0.95), CV < 0.2 = medium (0.85), CV < 0.3 = okay (0.70), else very low (0.3)
         if cv < 0.1:
             return 0.95
         elif cv < 0.2:
@@ -86,7 +86,7 @@ class SourceAgreementEngine:
         elif cv < 0.3:
             return 0.70
         else:
-            return 0.50
+            return 0.3
 
     @staticmethod
     def calculate_weighted_sales(
@@ -105,20 +105,47 @@ class SourceAgreementEngine:
         Returns:
             Tuple of (weighted_sales, sources_used)
         """
-        weighted = 0.0
-        sources_used = []
-
+        sources_available = []
+        source_values = {}
+        
         if aa_avg is not None and aa_avg > 0:
-            weighted += aa_avg * SourceAgreementEngine.AA_WEIGHT
-            sources_used.append("aa")
+            sources_available.append("aa")
+            source_values["aa"] = aa_avg
         if gst_avg is not None and gst_avg > 0:
-            weighted += gst_avg * SourceAgreementEngine.GST_WEIGHT
-            sources_used.append("gst")
+            sources_available.append("gst")
+            source_values["gst"] = gst_avg
         if upi_avg is not None and upi_avg > 0:
-            weighted += upi_avg * SourceAgreementEngine.UPI_WEIGHT
-            sources_used.append("upi")
-
-        return weighted, sources_used
+            sources_available.append("upi")
+            source_values["upi"] = upi_avg
+        
+        if not sources_available:
+            return 0.0, []
+        
+        # Normalize weights based on available sources
+        if len(sources_available) == 1:
+            # Only one source: use its value directly
+            weighted = source_values[sources_available[0]]
+            return weighted, sources_available
+        elif len(sources_available) == 2:
+            # Two sources: renormalize to 1.0
+            if "aa" in sources_available and "gst" in sources_available:
+                # AA + GST: 60% AA, 40% GST (renormalized from 60/30)
+                weighted = source_values["aa"] * 0.6 + source_values["gst"] * 0.4
+            elif "aa" in sources_available and "upi" in sources_available:
+                # AA + UPI: 60% AA, 40% UPI (renormalized from 60/10)
+                weighted = source_values["aa"] * 0.6 + source_values["upi"] * 0.4
+            else:  # GST + UPI
+                # GST + UPI: 75% GST, 25% UPI (renormalized from 30/10)
+                weighted = source_values["gst"] * 0.75 + source_values["upi"] * 0.25
+            return weighted, sources_available
+        else:  # All three sources
+            # Use original weights: 60% AA, 30% GST, 10% UPI
+            weighted = (
+                source_values["aa"] * SourceAgreementEngine.AA_WEIGHT
+                + source_values["gst"] * SourceAgreementEngine.GST_WEIGHT
+                + source_values["upi"] * SourceAgreementEngine.UPI_WEIGHT
+            )
+            return weighted, sources_available
 
     @staticmethod
     def get_confidence(agreement_score: float, sources_count: int) -> str:

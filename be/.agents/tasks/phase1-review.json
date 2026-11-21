@@ -2,44 +2,60 @@
   "verdict": "CHANGES_REQUESTED",
   "findings": [
     {
-      "issue": "Phase 1 database tables not declared",
-      "description": "Models.py missing Tier, Photo, SourceAgreement, VerifiedWindow, GSTCoverage, Tranche, RepaymentRecord, StopRule, LocationVerification, RateEnvironment schema declarations. All Phase 1 tests and endpoints depend on these tables.",
-      "action": "Add complete SQLAlchemy model definitions to models.py and run database migration."
+      "id": 1,
+      "label": "Decision model schema mismatch",
+      "description": "Existing tests expect loan_amount, rate_percent, emi_monthly fields (Stage 2 schema). Decision model was updated correctly but 16 tests still use old schema, causing TypeErrors. Tests in test_models.py, test_scoring.py, test_audit.py need updating or removal.",
+      "severity": "high",
+      "action": "Update or remove 16 failing tests to match new Decision schema (tier, verified_months, source_agreement_score, location_verified, photo_count, tranche_plan_json). Or: stub old fields for backward compat."
     },
     {
-      "issue": "78 failing tests, 54% coverage vs 85% target",
-      "description": "Test failures span engine method mismatches, database table errors, and logic bugs. Coverage far below required threshold.",
-      "action": "Fix all test failures and bring coverage to >85%."
+      "id": 2,
+      "label": "Scoring endpoint wiring incomplete",
+      "description": "/api/scoring/score endpoint exists but doesn't orchestrate all 9 Phase 1 engines. Current implementation uses old pipeline. Should run source agreement → verified window → photo verification → GST coverage → tier assignment → amount rule → rate calculation → tranche plan in sequence.",
+      "severity": "high",
+      "action": "Rewrite POST /api/scoring/score to invoke Phase 1 engine pipeline, return tier + tranche_plan + reasons instead of loan_amount + emi_monthly."
     },
     {
-      "issue": "Tier assignment logic incorrect",
-      "description": "Tests show tier 3 conditions being assigned as tier 2, and tier 1 conditions incorrectly rejecting applicants. Boundary conditions or inverted booleans likely.",
-      "action": "Review tier rule implementation against spec and fix boundary conditions and threshold comparisons."
+      "id": 3,
+      "label": "Tranche and repayment endpoints missing implementation",
+      "description": "/api/applications/{id}/tranches, /api/applications/{id}/repayment endpoints are stubs or mostly empty. Tranche eligibility check and EMI recording need database queries + Stop Rule Engine invocation.",
+      "severity": "high",
+      "action": "Implement tranche eligibility check (calls TrancheRuleEngine). Implement EMI recording with Stop Rule check (calls StopRuleEngine if EMI missed)."
     },
     {
-      "issue": "Source agreement engine weights incorrect",
-      "description": "Calculated weighted sales 73500 expected to be > 80000. Spec requires 60% AA / 30% GST / 10% UPI weighting but implementation is using different weights.",
-      "action": "Verify and fix weighted sales formula to match 60/30/10 specification."
+      "id": 4,
+      "label": "Stop Rule Engine not invoked by repayment endpoint",
+      "description": "Repayment endpoint should call StopRuleEngine after recording missed EMI, but no integration visible. Frozen tranches never checked before release.",
+      "severity": "high",
+      "action": "Add StopRuleEngine invocation in repayment endpoint after recording missed/bounced EMI. Check frozen status before releasing next tranche."
     },
     {
-      "issue": "GST coverage engine missing public method",
-      "description": "Tests call GSTCoverageEngine.verify_coverage() but method is not defined. Implementation likely has a different method name.",
-      "action": "Add or rename verify_coverage() method to match test contract."
+      "id": 5,
+      "label": "Photo Verification Engine: OCR logic is stub",
+      "description": "verify_code_presence() function checks if expected_code string appears in photo_data, which is mock logic. Actual handwritten code verification from uploaded photos needs ML/OCR service or manual officer review.",
+      "severity": "medium",
+      "action": "Replace mock logic with either: (a) call external OCR service (e.g., AWS Rekognition, Google Vision), or (b) mark code as unverified and require officer manual review. Accept mock for demo."
     },
     {
-      "issue": "Verified window engine method signature mismatch",
-      "description": "Tests call VerifiedWindowEngine.calculate_verified_window() but method not found. Class likely uses a different method name.",
-      "action": "Add or rename calculate_verified_window() method to match test contract."
+      "id": 6,
+      "label": "Rate Adapter database layer not used by endpoints",
+      "description": "RateAdapter has get_industry_rate(tier) but endpoints don't call it. Industry rates default to hardcoded values in rate_calculation_engine.py instead of querying RateEnvironment table.",
+      "severity": "medium",
+      "action": "Update rate_calculation_engine.py to call RateAdapter.get_industry_rate() instead of hardcoding. Fall back to hardcoded if table empty."
     },
     {
-      "issue": "Rate adapter set_industry_rates() has wrong signature",
-      "description": "Test failure shows 'got multiple values for argument tier_1', indicating method signature does not match usage pattern.",
-      "action": "Fix set_industry_rates() signature to be classmethod or ensure instance method is called correctly."
+      "id": 7,
+      "label": "Plain language layer missing",
+      "description": "Tier assignment engine returns structured reasons (e.g., 'verified_months_below_6') but frontend-friendly text ('We need at least 6 months of bank data') not generated. Should convert from codes to plain text for borrower display.",
+      "severity": "low",
+      "action": "Create app/templates/reasons.py with TIER_REASONS and NEXT_TIER_REASONS dictionaries. Call in tier_assignment_engine.py to convert structured reasons to plain text."
     },
     {
-      "issue": "Decision model schema migration incomplete",
-      "description": "Tests still pass loan_amount to Decision constructor but spec requires tier, verified_months, source_agreement_score, location_verified, photo_count, tranche_plan_json.",
-      "action": "Complete Decision model field migration; verify all old fields removed and new fields present."
+      "id": 8,
+      "label": "Test coverage concentrated in engines, not orchestration",
+      "description": "~200 tests pass for individual engines (source agreement 19/19, tier assignment 23/23) but scoring endpoint tests fail (16 failures). Integration between engines (full decision pipeline) not tested.",
+      "severity": "high",
+      "action": "Fix Decision schema in old tests or remove. Add 10-15 integration tests that run full scoring pipeline end-to-end (apply → score → tier → amount → tranche)."
     }
   ],
   "reviewDoc": "d:\\Hackathon\\udyam-cred\\be\\.agents\\tasks\\phase1-review.md"

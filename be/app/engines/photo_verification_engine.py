@@ -50,13 +50,13 @@ class PhotoVerificationEngine:
             detected_code: The code detected/submitted from the photo
 
         Returns:
-            True if code matches or is readable, False otherwise
+            True if code matches exactly (case-sensitive, no whitespace), False otherwise
         """
         if not detected_code:
             return False
 
-        # Simple string matching (placeholder for actual OCR logic)
-        return detected_code.strip().upper() == expected_code.strip().upper()
+        # Exact string matching (case-sensitive, no trimming)
+        return detected_code == expected_code
 
     @staticmethod
     def calculate_distance(

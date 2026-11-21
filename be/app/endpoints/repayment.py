@@ -1,11 +1,13 @@
 """Repayment endpoints: view EMI history, record payments, monitor status."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+import json
 
 from app.database import get_db
-from app.models import Application, Tranche, RepaymentRecord, User, Decision
+from app.models import Application, Tranche, RepaymentRecord, User, Decision, AuditLog
 from app.schemas import RepaymentStatusOut, NextEMIOut, RepaymentMonitorOut
 from app.utils import utcnow_naive
+from app.engines.stop_rule_engine import StopRuleEngine
 from datetime import datetime
 
 router = APIRouter(prefix="/api/applications", tags=["repayment"])
@@ -72,6 +74,18 @@ def record_emi_payment(
 ) -> dict:
     """
     Record an EMI payment (admin endpoint).
+    
+    Steps:
+    1. Save RepaymentRecord as currently implemented
+    2. Call StopRuleEngine(application_id)
+    3. If stop.should_freeze == true:
+       - Set Application.frozen = true
+       - Set Application.frozen_date = today()
+       - Set Application.status = "frozen"
+       - Create AuditLog entry with reason
+       - Return repayment record + freeze_status = true + freeze_reason
+    4. If stop.should_freeze == false:
+       - Return repayment record + freeze_status = false
 
     Args:
         application_id: Application ID
@@ -80,6 +94,15 @@ def record_emi_payment(
         paid_amount: Amount paid
         paid_date: Payment date (ISO format, defaults to now)
     """
+    # Get application (needed for freeze operations)
+    app = (
+        db.query(Application)
+        .filter(Application.id == application_id)
+        .first()
+    )
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
     # Get tranche
     tranche = (
         db.query(Tranche)
@@ -125,11 +148,60 @@ def record_emi_payment(
         status_str = "late"
         days_late = days_overdue
 
-    # Update record
+    # Step 1: Update and save repayment record
     record.paid_date = payment_date
     record.payment_status = status_str
     record.days_late = days_late
+    db.commit()
 
+    # Step 2: Invoke StopRuleEngine after recording repayment
+    stop_result = StopRuleEngine.check_and_apply(application_id, db)
+
+    freeze_status = False
+    freeze_reason = None
+
+    # Step 3: If freeze is triggered, update Application and create AuditLog
+    if stop_result.should_freeze:
+        app.frozen = True
+        app.frozen_date = utcnow_naive()
+        app.status = "frozen"
+        db.commit()
+
+        # Create AuditLog entry for freeze
+        audit_log = AuditLog(
+            entity_type="application",
+            entity_id=application_id,
+            action="frozen",
+            officer_id=None,  # System action
+            details_json=json.dumps({
+                "reason": stop_result.reason,
+                "missed_emi_count": stop_result.missed_emi_count,
+                "trigger": "stop_rule_engine",
+            }),
+            timestamp=utcnow_naive(),
+        )
+        db.add(audit_log)
+        db.commit()
+
+        freeze_status = True
+        freeze_reason = stop_result.reason
+
+    # Log repayment action
+    audit_log = AuditLog(
+        entity_type="repayment_record",
+        entity_id=record.id,
+        action="recorded",
+        officer_id=None,
+        details_json=json.dumps({
+            "tranche_num": tranche_num,
+            "emi_num": emi_num,
+            "payment_status": status_str,
+            "days_late": days_late,
+            "freeze_triggered": freeze_status,
+        }),
+        timestamp=utcnow_naive(),
+    )
+    db.add(audit_log)
     db.commit()
 
     return {
@@ -137,6 +209,8 @@ def record_emi_payment(
         "message": f"EMI {emi_num} for tranche {tranche_num} recorded",
         "payment_status": status_str,
         "days_late": days_late,
+        "freeze_status": freeze_status,
+        "freeze_reason": freeze_reason,
     }
 
 
