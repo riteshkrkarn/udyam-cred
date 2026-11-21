@@ -70,6 +70,52 @@ export default function AppHeader() {
 
         {/* Right-side actions */}
         <div className="header-actions" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginLeft: 'auto' }}>
+          {/* Demo Buttons - Always Show */}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button
+              className="btn small"
+              style={{ 
+                background: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: 'var(--sheet)',
+                padding: '0.5rem 0.8rem',
+                fontSize: '12px'
+              }}
+              onClick={() => handleDemoClick('/applications/demo_001/result')}
+              title="View borrower demo"
+            >
+              📱 Borrower
+            </button>
+            <button
+              className="btn small"
+              style={{ 
+                background: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: 'var(--sheet)',
+                padding: '0.5rem 0.8rem',
+                fontSize: '12px'
+              }}
+              onClick={() => handleDemoClick('/bank/queue')}
+              title="View officer queue"
+            >
+              👨‍💼 Queue
+            </button>
+            <button
+              className="btn small"
+              style={{ 
+                background: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: 'var(--sheet)',
+                padding: '0.5rem 0.8rem',
+                fontSize: '12px'
+              }}
+              onClick={() => handleDemoClick('/bank/case/demo_001')}
+              title="View case details"
+            >
+              📋 Case
+            </button>
+          </div>
+
           {currentRole ? (
             <>
               <span
