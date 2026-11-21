@@ -1,3 +1,6 @@
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --paper: #E9EBDF;
   --sheet: #F7F7F0;
