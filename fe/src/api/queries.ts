@@ -7,12 +7,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   auth,
   reconciliation,
+  bank,
+  applications,
   setTokens,
   clearTokens,
   getRefreshToken,
   type LoginRequest,
   type RegisterRequest,
   type ShopReconcileRequest,
+  type BankQueueResponse,
+  type BankCaseResponse,
+  type BankDecisionResponse,
+  type ApplicationOut,
   ApiError,
 } from './client'
 
@@ -102,4 +108,67 @@ export function usePrefetchReconcile() {
       queryFn: () => reconciliation.check(shop),
     })
   }
+}
+
+// ============ Bank / Officer queries ============
+
+export function useBankQueue(params?: { status?: string; skip?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ['bank', 'queue', params],
+    queryFn: () => bank.queue(params),
+  })
+}
+
+export function useBankCase(appId: string | number | undefined) {
+  return useQuery({
+    queryKey: ['bank', 'case', appId],
+    queryFn: () => bank.caseDetail(appId!),
+    enabled: !!appId,
+  })
+}
+
+export function useBankDecision(appId: string | number | undefined) {
+  return useQuery({
+    queryKey: ['bank', 'decision', appId],
+    queryFn: () => bank.decision(appId!),
+    enabled: !!appId,
+  })
+}
+
+export function useBankOverride() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ appId, reason, newAmount }: { appId: string | number; reason: string; newAmount?: number }) =>
+      bank.override(appId, reason, newAmount),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['bank', 'queue'] })
+      qc.invalidateQueries({ queryKey: ['bank', 'case', vars.appId] })
+    },
+  })
+}
+
+export function useApplications(status?: string) {
+  return useQuery({
+    queryKey: ['applications', status],
+    queryFn: () => applications.list(status),
+  })
+}
+
+export function useApplication(id: number | string | undefined) {
+  return useQuery({
+    queryKey: ['applications', id],
+    queryFn: () => applications.get(id!),
+    enabled: !!id,
+  })
+}
+
+export function useCreateApplication() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { shop_id?: number; loan_amount_requested: number; purpose: string }) =>
+      applications.create(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['applications'] })
+    },
+  })
 }

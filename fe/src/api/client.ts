@@ -185,3 +185,95 @@ export const reconciliation = {
       body: JSON.stringify(shop),
     }),
 }
+
+// ── Bank / Officer endpoints ──────────────────────────────────────────────────
+
+export interface BankQueueResponse {
+  total: number
+  applications: {
+    id: number
+    shop_id: number | null
+    amount_requested: number | null
+    status: string
+    created_at: string
+  }[]
+}
+
+export interface BankCaseResponse {
+  application_id: number
+  tier: number
+  amount: number
+  confidence: number
+  status: string
+  photos_count: number
+  documents_count: number
+  bank_inflows_months: number
+}
+
+export interface BankDecisionResponse {
+  tier: number
+  amount: number
+  tenor_months: number
+  rate_percent: number
+  reasons: string[]
+  tranche_plan: Record<string, { amount: number; condition: string }>
+}
+
+export const bank = {
+  queue: (params?: { status?: string; skip?: number; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.status) qs.set('status', params.status)
+    if (params?.skip !== undefined) qs.set('skip', String(params.skip))
+    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
+    return request<BankQueueResponse>(`/bank/queue${qs.toString() ? '?' + qs : ''}`)
+  },
+
+  caseDetail: (appId: string | number) =>
+    request<BankCaseResponse>(`/bank/cases/${appId}`),
+
+  decision: (appId: string | number) =>
+    request<BankDecisionResponse>(`/bank/cases/${appId}/decision`),
+
+  override: (appId: string | number, reason: string, newAmount?: number) => {
+    const qs = new URLSearchParams({ reason })
+    if (newAmount !== undefined) qs.set('new_amount', String(newAmount))
+    return request<{ status: string; application_id: number }>(
+      `/bank/cases/${appId}/override?${qs}`,
+      { method: 'POST' },
+    )
+  },
+
+  auditLog: (params?: { skip?: number; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params?.skip !== undefined) qs.set('skip', String(params.skip))
+    if (params?.limit !== undefined) qs.set('limit', String(params.limit))
+    return request<{ entries: unknown[]; total: number }>(`/bank/audit${qs.toString() ? '?' + qs : ''}`)
+  },
+}
+
+// ── Applications endpoints ────────────────────────────────────────────────────
+
+export interface ApplicationOut {
+  id: number
+  borrower_id: number | null
+  shop_id: number | null
+  loan_amount_requested: number
+  purpose: string
+  status: string
+  created_at: string
+}
+
+export const applications = {
+  list: (status?: string) => {
+    const qs = status ? `?status=${status}` : ''
+    return request<ApplicationOut[]>(`/api/applications${qs}`)
+  },
+  get: (id: number | string) => request<ApplicationOut>(`/api/applications/${id}`),
+  create: (body: { shop_id?: number; loan_amount_requested: number; purpose: string }) =>
+    request<ApplicationOut>('/api/applications', { method: 'POST', body: JSON.stringify(body) }),
+  updateStatus: (id: number | string, status: string) =>
+    request<ApplicationOut>(`/api/applications/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+}
