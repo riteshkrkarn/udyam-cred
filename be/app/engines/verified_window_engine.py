@@ -30,26 +30,18 @@ class VerifiedWindowEngine:
             end_date: End date
 
         Returns:
-            Number of full months
+            Number of full months (rounded to nearest month)
         """
         if start_date > end_date:
             return 0
 
-        months = 0
-        current = start_date
-
-        while current <= end_date:
-            # Move to next month
-            if current.month == 12:
-                next_month = current.replace(year=current.year + 1, month=1)
-            else:
-                next_month = current.replace(month=current.month + 1)
-
-            if next_month <= end_date:
-                months += 1
-            current = next_month
-
-        return months
+        # Calculate days difference
+        days_diff = (end_date - start_date).days
+        
+        # Convert days to months (approximate: 30 days per month)
+        months = round(days_diff / 30.0)
+        
+        return max(months, 0)
 
     @staticmethod
     def calculate_window_overlap(
@@ -116,10 +108,17 @@ class VerifiedWindowEngine:
         Returns:
             Quality score (0-1)
         """
-        # More months = higher quality
-        # More sources = higher quality
-        base_score = min(months_verified / 24.0, 1.0)  # Max at 24 months
+        # Base score: 0.90 at 6 months, 0.95 at 12 months, 1.0 at 24+ months
+        if months_verified >= 24:
+            base_score = 1.0
+        elif months_verified >= 12:
+            base_score = 0.95
+        elif months_verified >= 6:
+            base_score = 0.90
+        else:
+            base_score = max(months_verified / 6.0 * 0.90, 0.0)
 
+        # Adjust for number of sources
         if sources_count >= 3:
             return min(base_score * 1.0, 1.0)
         else:  # 2 sources
@@ -133,7 +132,7 @@ class VerifiedWindowEngine:
         gst_end: Optional[datetime] = None,
         upi_start: Optional[datetime] = None,
         upi_end: Optional[datetime] = None,
-        tier_min_months: int = 6,
+        tier_min_months: int = 12,
     ) -> VerifiedWindowResult:
         """
         Calculate verified window and quality metrics.
@@ -198,7 +197,7 @@ class VerifiedWindowEngine:
         gst_end: Optional[datetime] = None,
         upi_start: Optional[datetime] = None,
         upi_end: Optional[datetime] = None,
-        tier_min_months: int = 6,
+        tier_min_months: int = 12,
     ) -> VerifiedWindowResult:
         """
         Alias for calculate_verification. Calculate verified window and quality metrics.

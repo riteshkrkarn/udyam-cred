@@ -128,7 +128,7 @@ class TestGSTCoverageEngine:
     def test_good_coverage(self):
         """Test GST coverage with good alignment."""
         result = GSTCoverageEngine.check_coverage(
-            purchases_from_bills=500000,
+            purchases_declared=500000,
             gst_turnover=520000,
         )
         assert result.coverage_percent > 1.0
@@ -137,7 +137,7 @@ class TestGSTCoverageEngine:
     def test_low_coverage(self):
         """Test GST coverage with underdeclaration."""
         result = GSTCoverageEngine.check_coverage(
-            purchases_from_bills=500000,
+            purchases_declared=500000,
             gst_turnover=350000,  # Too low
         )
         assert result.coverage_percent < 0.8
@@ -146,7 +146,7 @@ class TestGSTCoverageEngine:
     def test_high_coverage(self):
         """Test GST coverage with overstating."""
         result = GSTCoverageEngine.check_coverage(
-            purchases_from_bills=500000,
+            purchases_declared=500000,
             gst_turnover=700000,  # Too high
         )
         assert result.coverage_percent > 1.2
