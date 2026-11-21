@@ -1,0 +1,297 @@
+# UdyamCred Policy v2: Tiered Lending Model
+# Covers: tiers, amounts, tranches, stops, windows, and source agreement thresholds
+# Version: 2.0.0
+# Effective: Stage A implementation
+
+version: "2.0.0"
+
+defaults:
+  tolerance: 0.005  # 0.5% tolerance for rounding
+
+# ============================================================================
+# TIER DEFINITIONS
+# ============================================================================
+
+tiers:
+  tier_1:
+    name: "Tier 1"
+    description: "Money-side evidence only (bank inflows)"
+    min_verified_months: 0  # Can apply immediately
+    max_verified_months: 999
+  
+  tier_2:
+    name: "Tier 2"
+    description: "GST registered or long steady bank history"
+    min_verified_months: 6
+    max_verified_months: 999
+  
+  tier_3:
+    name: "Tier 3"
+    description: "Udyam registered plus repayment record with us"
+    min_verified_months: 6
+    max_verified_months: 999
+
+# ============================================================================
+# TIER RULE: Which tier is the shop assigned?
+# ============================================================================
+
+tier_rule:
+  # Tier 3 if: Udyam registration + repayment record with us
+  tier_3_conditions:
+    - udyam_registered: true
+      repayment_record_months_gt: 0
+  
+  # Tier 2 if: GST filings OR (bank history >= 6 months)
+  tier_2_conditions:
+    - gst_registered: true
+    - bank_history_months_gte: 6
+  
+  # Otherwise: Tier 1
+  default_tier: 1
+
+# ============================================================================
+# VERIFIED WINDOW RULE: How many months of verified data?
+# ============================================================================
+
+verified_window:
+  minimum_months_required: 6
+  weighting:
+    - months_covered: 6
+      weight_multiplier: 1.0
+    - months_covered: 12
+      weight_multiplier: 1.2
+    - months_covered: 24
+      weight_multiplier: 1.5
+
+# ============================================================================
+# AMOUNT RULE: Cap and scaling by tier and evidence
+# ============================================================================
+
+amount_rule:
+  tier_1:
+    absolute_cap: 50000  # Rs 50,000 strict cap for Tier 1
+    evidence_scaling_disabled: true
+  
+  tier_2:
+    absolute_cap: 500000  # Rs 5,00,000 cap for Tier 2
+    evidence_scaling:
+      - verified_months: 6
+        multiplier: 1.0
+      - verified_months: 12
+        multiplier: 1.2
+      - verified_months: 24
+        multiplier: 1.5
+  
+  tier_3:
+    absolute_cap: 1000000  # Rs 10,00,000 cap for Tier 3
+    evidence_scaling:
+      - verified_months: 6
+        multiplier: 1.2
+      - verified_months: 12
+        multiplier: 1.5
+      - verified_months: 24
+        multiplier: 2.0
+
+# ============================================================================
+# GST COVERAGE RULE: Matching purchases to GST filings
+# ============================================================================
+
+gst_coverage:
+  thresholds:
+    high_coverage: 0.80  # >=80% → high signal
+    medium_coverage: 0.50  # 50-80% → medium signal
+    low_coverage: 0.00  # <50% → low signal (but doesn't fail)
+  confidence_impact:
+    high_coverage: 1.0
+    medium_coverage: 0.7
+    low_coverage: 0.4
+
+# ============================================================================
+# INFLOW QUALITY RULE: Steady inflows rated higher than single large inflows
+# ============================================================================
+
+inflow_quality:
+  # Coefficient of variation: std_dev / mean
+  # Lower CV = more steady inflows
+  steady_inflow_cv_threshold: 0.3  # CV <= 0.3 is "steady"
+  steady_inflow_weight_multiplier: 1.5
+  
+  # Single large inflow (one inflow > 2x average) is down-weighted
+  anomaly_multiplier_threshold: 2.0  # 2x mean
+  anomaly_weight_multiplier: 0.6
+
+# ============================================================================
+# ABCA (SOURCE AGREEMENT): Comparing sources for agreement
+# ============================================================================
+
+abca:
+  # Agreement bands: how close do sources need to agree?
+  agreement_bands:
+    - band_name: "excellent"
+      min_pct_agree: 0.95
+      max_pct_agree: 1.00
+      confidence: 0.95
+    - band_name: "good"
+      min_pct_agree: 0.90
+      max_pct_agree: 0.95
+      confidence: 0.80
+    - band_name: "fair"
+      min_pct_agree: 0.80
+      max_pct_agree: 0.90
+      confidence: 0.60
+    - band_name: "poor"
+      min_pct_agree: 0.60
+      max_pct_agree: 0.80
+      confidence: 0.30
+    - band_name: "disagree"
+      min_pct_agree: 0.00
+      max_pct_agree: 0.60
+      confidence: 0.10
+  
+  # Weight each source by trust level
+  source_weights:
+    aa_sourced: 0.9
+    filing_sourced: 0.8
+    live_capture: 0.7
+    owner_uploaded: 0.5
+    owner_entered: 0.3
+
+# ============================================================================
+# TRANCHE RULE: When is the next tranche eligible?
+# ============================================================================
+
+tranche_rule:
+  tranche_1:
+    name: "First tranche"
+    amount_pct: 0.5  # 50% of loan amount
+    release_on_approval: true
+  
+  tranche_2:
+    name: "Second tranche"
+    amount_pct: 0.3  # 30% of loan amount
+    release_conditions:
+      - on_time_emis_required: 3  # 3 on-time EMIs after first tranche
+        within_months: 6
+  
+  tranche_3:
+    name: "Third tranche"
+    amount_pct: 0.2  # 20% of loan amount
+    release_conditions:
+      - on_time_emis_required: 6  # 6 on-time EMIs total
+        within_months: 12
+      - udyam_registration_required: false  # Optional, not required
+
+# ============================================================================
+# STOP RULE: When do tranches freeze?
+# ============================================================================
+
+stop_rule:
+  missed_emis_threshold: 2  # Two missed EMIs → freeze
+  consecutive_or_cumulative: "cumulative"  # Cumulative misses (not necessarily consecutive)
+  action_on_trigger:
+    freeze_tranches: true
+    open_review: true
+    notify_officer: true
+
+# ============================================================================
+# PHOTO AND LOCATION VALIDATION
+# ============================================================================
+
+photo_validation:
+  required_shots:
+    - shop_front
+    - stock_shelves
+    - bills_or_ledger
+  
+  challenge:
+    code_length: 4
+    code_expiry_minutes: 5
+    max_retries: 3
+  
+  location:
+    min_accuracy_meters: 50  # Accuracy must be <=50m
+    max_distance_to_rent_address_meters: 500  # Photo location must be within 500m of rent agreement
+
+# ============================================================================
+# DOCUMENT REQUIREMENTS
+# ============================================================================
+
+document_requirements:
+  all_tiers:
+    - electricity_bill
+    - or: rent_receipt  # At least one of these two
+  
+  tier_2:
+    - gst_return_file  # GSTR-2B
+  
+  tier_3:
+    - udyam_certificate
+
+# ============================================================================
+# CONFIDENCE THRESHOLDS
+# ============================================================================
+
+confidence:
+  high_threshold: 0.80  # >= 80% → approve with confidence
+  medium_threshold: 0.60  # 60-80% → send to approver
+  low_threshold: 0.00  # < 60% → recommend rejection
+
+# ============================================================================
+# CONSENT SOURCES
+# ============================================================================
+
+consent_sources:
+  live_photos:
+    name: "Live Shop Photos"
+    purpose: "Verify shop location and inventory"
+    retention_days: 365
+  
+  location_data:
+    name: "Location Data"
+    purpose: "Match photo location with rent agreement"
+    retention_days: 365
+  
+  bank_data:
+    name: "Bank Data via Account Aggregator"
+    purpose: "Verify business inflows"
+    retention_days: 180
+  
+  gst_filings:
+    name: "GST Filings"
+    purpose: "Verify business turnover"
+    retention_days: 180
+  
+  documents:
+    name: "Documents"
+    purpose: "Verify identity and business registration"
+    retention_days: 365
+  
+  household_details:
+    name: "Household Details"
+    purpose: "Calculate household budget"
+    retention_days: 90
+
+# ============================================================================
+# SHOP CATEGORIES (Original, kept for backwards compatibility)
+# ============================================================================
+
+shop_categories:
+  general_retail:
+    label: "General Retail"
+    margin_low: 0.10
+    margin_high: 0.30
+  
+  electronics:
+    label: "Electronics Retail"
+    margin_low: 0.05
+    margin_high: 0.20
+  
+  grocery:
+    label: "Grocery / Provisions"
+    margin_low: 0.05
+    margin_high: 0.15
+  
+  clothing:
+    label: "Clothing / Apparel"
+    margin_low: 0.40
+    margin_high: 0.80

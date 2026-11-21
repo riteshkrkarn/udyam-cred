@@ -8,6 +8,8 @@ import LandingPage from '../features/landing/LandingPage'
 // Lazy-load heavier routes
 const ApplyPage = lazy(() => import('../features/borrower/ApplyPage'))
 const ResultPage = lazy(() => import('../features/borrower/ResultPage'))
+const BankQueuePage = lazy(() => import('../features/bank/Queue'))
+const BankCaseViewPage = lazy(() => import('../features/bank/CaseView'))
 const NotFoundPage = lazy(() => import('./NotFoundPage'))
 
 function LoadingFallback() {
@@ -31,6 +33,9 @@ const router = createBrowserRouter([
       { index: true, element: <LandingPage /> },
       { path: 'apply', element: <ApplyPage /> },
       { path: 'applications/:id/result', element: <ResultPage /> },
+      // Bank officer routes
+      { path: 'bank/queue', element: <BankQueuePage /> },
+      { path: 'bank/case/:applicationId', element: <BankCaseViewPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
