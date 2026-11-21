@@ -130,7 +130,9 @@ class Application(Base):
     purpose = Column(String(255), nullable=True)
     status = Column(
         String(32), nullable=False, default="pending"
-    )  # pending | submitted | under_review | approved | rejected
+    )  # pending | submitted | under_review | approved | rejected | frozen
+    frozen = Column(Boolean, nullable=False, default=False)
+    frozen_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow_naive, nullable=False)
 
     borrower = relationship("User", back_populates="applications")
