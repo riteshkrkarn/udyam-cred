@@ -1,0 +1,137 @@
+.demo-banner {
+  background: linear-gradient(135deg, #f0ad4e 0%, #ec971f 100%);
+  color: #333;
+  padding: 1rem;
+  text-align: center;
+  border-bottom: 3px solid #d58512;
+  font-weight: 600;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.demo-banner.banner-borrower {
+  background: linear-gradient(135deg, #5cb85c 0%, #449d44 100%);
+  border-bottom: 3px solid #3d8b40;
+  color: white;
+}
+
+.demo-banner.banner-officer {
+  background: linear-gradient(135deg, #5bc0de 0%, #46b8da 100%);
+  border-bottom: 3px solid #31708f;
+  color: white;
+}
+
+.demo-banner.banner-case {
+  background: linear-gradient(135deg, #d9534f 0%, #c9302c 100%);
+  border-bottom: 3px solid #ac2925;
+  color: white;
+}
+
+.demo-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.demo-badge {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.demo-banner p {
+  margin: 0;
+  font-size: 14px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.demo-close {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  color: inherit;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.demo-close:hover {
+  background: rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.demo-close:active {
+  transform: translateY(0);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .demo-banner-content {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .demo-banner p {
+    min-width: auto;
+    font-size: 13px;
+  }
+
+  .demo-badge {
+    padding: 0.35rem 0.7rem;
+    font-size: 11px;
+  }
+
+  .demo-close {
+    padding: 0.45rem 0.9rem;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .demo-banner {
+    padding: 0.8rem 0.5rem;
+  }
+
+  .demo-banner-content {
+    gap: 0.5rem;
+  }
+
+  .demo-banner p {
+    font-size: 12px;
+  }
+
+  .demo-badge {
+    font-size: 10px;
+    padding: 0.3rem 0.6rem;
+  }
+
+  .demo-close {
+    font-size: 11px;
+    padding: 0.4rem 0.8rem;
+  }
+}
