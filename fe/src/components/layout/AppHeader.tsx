@@ -12,6 +12,11 @@ export default function AppHeader() {
 
   function close() { setNavOpen(false) }
 
+  function handleDemoClick(route: string) {
+    close()
+    navigate(route)
+  }
+
   const isOfficerOrAbove =
     currentRole === 'officer' ||
     currentRole === 'approver' ||
