@@ -1,7 +1,7 @@
 {
   "generator_id": 1,
   "seed": 42,
-  "n_shops": 5000,
+  "n_shops": 500,
   "months_per_shop": 30,
   "health_mean": 0.6,
   "health_std": 0.25,
