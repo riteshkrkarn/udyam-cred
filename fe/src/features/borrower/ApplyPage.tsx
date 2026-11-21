@@ -7,14 +7,13 @@ import Sheet from '../../components/ui/Sheet'
 
 const schema = z.object({
   amount: z
-    .number({ invalid_type_error: 'Enter a number.' })
+    .number()
     .min(10_000, 'Minimum loan amount is ₹10,000.')
     .max(2_000_000, 'Maximum loan amount is ₹20,00,000.'),
   purpose: z.enum(
     ['Stock purchase', 'Festival stock', 'Shop expansion', 'Working capital', 'Other'],
-    { required_error: 'Choose a purpose.' },
-  ),
-  consent: z.literal(true, { errorMap: () => ({ message: 'Consent is required.' }) }),
+  ).refine(v => v !== '', 'Choose a purpose.'),
+  consent: z.literal(true).refine(v => v === true, 'Consent is required.'),
 })
 
 type FormValues = z.infer<typeof schema>

@@ -113,7 +113,15 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+  }
+
+  if (options.headers) {
+    const headerEntries = options.headers instanceof Headers 
+      ? Array.from(options.headers.entries())
+      : Object.entries(options.headers as Record<string, string>)
+    headerEntries.forEach(([key, value]) => {
+      headers[key] = String(value)
+    })
   }
 
   if (useAuth) {

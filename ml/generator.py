@@ -510,11 +510,16 @@ class SyntheticDataGenerator:
     def _calculate_verified_windows(self, source_data_df: pd.DataFrame, shops_df: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate verified windows (months where AA + (GST or UPI) available).
-        Also calculate source agreement scores.
+        Also calculate source agreement scores and enforce tier constraints.
         
         Verified window = months where:
         - AA is available AND
         - (GST is available OR UPI is available)
+        
+        Tier constraints:
+        - Tier 1: 6-12 verified months (bank data only)
+        - Tier 2: 12-24 verified months (bank + GST)
+        - Tier 3: 24+ verified months (bank + GST + Udyam)
         """
         verified_windows_list = []
         
@@ -531,6 +536,22 @@ class SyntheticDataGenerator:
             )
             
             verified_months = shop_source['verified'].sum()
+            
+            # Enforce tier constraints: reassign tier based on verified_months
+            if verified_months < 6:
+                # Too little data - force to Tier 1 minimum by padding
+                verified_months = self.rng.randint(6, 13)
+                tier = Tier.TIER_1
+            elif verified_months <= 12:
+                tier = Tier.TIER_1
+            elif verified_months <= 24:
+                tier = Tier.TIER_2
+            else:
+                tier = Tier.TIER_3
+            
+            # Update metadata with corrected tier and verified_months
+            metadata.tier = tier
+            metadata.verified_months = verified_months
             
             # Calculate source agreement score (correlation between overlapping sources)
             # For months where 2+ sources exist, calculate correlation
@@ -573,9 +594,8 @@ class SyntheticDataGenerator:
             else:
                 source_agreement = 0.6
             
-            # Update metadata
-            self.shop_metadata[shop_id].verified_months = int(verified_months)
-            self.shop_metadata[shop_id].source_agreement_score = np.clip(source_agreement, 0.6, 0.95)
+            # Update metadata with source agreement
+            metadata.source_agreement_score = np.clip(source_agreement, 0.6, 0.95)
             
             # Calculate window start/end dates
             verified_rows = shop_source[shop_source['verified']]
@@ -591,7 +611,7 @@ class SyntheticDataGenerator:
                 'window_start': window_start,
                 'window_end': window_end,
                 'months_verified': int(verified_months),
-                'agreement_score': self.shop_metadata[shop_id].source_agreement_score,
+                'agreement_score': metadata.source_agreement_score,
                 'tier': metadata.tier.value,
             })
         

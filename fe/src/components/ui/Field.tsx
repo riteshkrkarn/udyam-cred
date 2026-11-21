@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes } from 'react'
+import { forwardRef, type InputHTMLAttributes, type SelectHTMLAttributes } from 'react'
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string
@@ -6,17 +6,50 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string
   /** Shows live value in the label (useful for range inputs) */
   outputValue?: string
+  type?: string
+}
+
+interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
+  label: string
+  note?: string
+  error?: string
+  options?: { value: string; label: string }[]
 }
 
 const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
-  { label, note, error, outputValue, ...inputProps },
+  { label, note, error, outputValue, type, ...inputProps },
+  ref,
+) {
+  if (type === 'select') {
+    return <span>Use SelectField instead</span>
+  }
+
+  return (
+    <label>
+      {label}
+      {outputValue !== undefined && <output>{outputValue}</output>}
+      <input ref={ref} type={type} {...inputProps} />
+      {note && <span className="note">{note}</span>}
+      {error && <span className="err">{error}</span>}
+    </label>
+  )
+})
+
+export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(function SelectField(
+  { label, note, error, options, ...selectProps },
   ref,
 ) {
   return (
     <label>
       {label}
-      {outputValue !== undefined && <output>{outputValue}</output>}
-      <input ref={ref} {...inputProps} />
+      <select ref={ref} {...selectProps}>
+        <option value="">Choose one</option>
+        {options?.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
       {note && <span className="note">{note}</span>}
       {error && <span className="err">{error}</span>}
     </label>

@@ -15,7 +15,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Sheet from '../../components/ui/Sheet'
 import StepList from '../../components/ui/StepList'
-import Field from '../../components/ui/Field'
+import Field, { SelectField } from '../../components/ui/Field'
 
 const STEPS = [
   { num: 1, title: 'Amount & Purpose', desc: 'How much do you need?' },
@@ -61,9 +61,8 @@ function Step1({ onNext, data }: { onNext: (data: Step1Data) => void; data?: Ste
           error={errors.amount?.message}
         />
 
-        <Field
+        <SelectField
           label="Purpose"
-          type="select"
           options={[
             { value: 'stock', label: 'Stock purchase' },
             { value: 'festival', label: 'Festival stock' },
