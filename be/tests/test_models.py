@@ -321,7 +321,7 @@ class TestDecisionModel:
             verdict="approved",
             tier=1,
             verified_months=10,
-            source_agreement_score=0.85,
+            source_agreement=0.85,
             tranche_plan_json=tranche_plan_json,
             reasons_json=reasons_json,
         )
@@ -334,7 +334,7 @@ class TestDecisionModel:
         assert retrieved.verdict == "approved"
         assert retrieved.tier == 1
         assert retrieved.verified_months == 10
-        assert retrieved.source_agreement_score == 0.85
+        assert retrieved.source_agreement == 0.85
         assert json.loads(retrieved.reasons_json) == reasons
         assert json.loads(retrieved.tranche_plan_json)[0]["amount"] == 80000
 
@@ -376,7 +376,7 @@ class TestOverrideModel:
             verdict="approved",
             tier=1,
             verified_months=10,
-            source_agreement_score=0.85,
+            source_agreement=0.85,
             tranche_plan_json=tranche_plan_json,
         )
         db_session.add(decision)
@@ -508,7 +508,7 @@ class TestModelRelationships:
             verdict="approved",
             tier=1,
             verified_months=10,
-            source_agreement_score=0.80,
+            source_agreement=0.80,
         )
         db_session.add(decision)
         db_session.commit()
