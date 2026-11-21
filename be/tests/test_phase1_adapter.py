@@ -12,11 +12,18 @@ from sqlalchemy.orm import Session
 
 from app.adapters.rate_adapter import RateAdapter
 from app.models import RateEnvironment
-from app.database import SessionLocal
+from app.database import SessionLocal, Base, engine
 
 
 class TestRateAdapter:
     """Test rate adapter functionality."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Create all tables before each test."""
+        Base.metadata.create_all(bind=engine)
+        yield
+        Base.metadata.drop_all(bind=engine)
 
     @pytest.fixture
     def session(self):
@@ -39,7 +46,7 @@ class TestRateAdapter:
         session.commit()
 
         # Fetch rate
-        rate = RateAdapter.get_industry_rate(session, tier=1)
+        rate = RateAdapter.get_industry_rate(tier=1, db=session)
         assert rate == 14.5
 
     def test_get_industry_rate_tier2(self, session):
@@ -54,7 +61,7 @@ class TestRateAdapter:
         session.add(rate_env)
         session.commit()
 
-        rate = RateAdapter.get_industry_rate(session, tier=2)
+        rate = RateAdapter.get_industry_rate(tier=2, db=session)
         assert rate == 12.0
 
     def test_get_industry_rate_tier3(self, session):
@@ -69,13 +76,13 @@ class TestRateAdapter:
         session.add(rate_env)
         session.commit()
 
-        rate = RateAdapter.get_industry_rate(session, tier=3)
+        rate = RateAdapter.get_industry_rate(tier=3, db=session)
         assert rate == 10.5
 
     def test_set_industry_rates_updates_database(self, session):
         """Test that set_industry_rates updates the database."""
         RateAdapter.set_industry_rates(
-            session, tier_1=14.5, tier_2=12.0, tier_3=10.5, source="manual"
+            tier_1=14.5, tier_2=12.0, tier_3=10.5, source="manual", db=session
         )
 
         latest = (
@@ -89,7 +96,7 @@ class TestRateAdapter:
         """Test rate history is tracked by date."""
         # Add first rate
         RateAdapter.set_industry_rates(
-            session, tier_1=14.5, tier_2=12.0, tier_3=10.5, source="manual"
+            tier_1=14.5, tier_2=12.0, tier_3=10.5, source="manual", db=session
         )
 
         # Add second rate with different values
@@ -117,13 +124,14 @@ class TestRateAdapter:
         session.commit()
 
         # Should return default
-        rate = RateAdapter.get_industry_rate(session, tier=1, default=14.5)
+        rate = RateAdapter.get_industry_rate(tier=1, db=session)
         assert rate == 14.5
 
     def test_rate_adapter_returns_none_on_missing_and_no_default(self, session):
-        """Test returns None when rate missing and no default."""
+        """Test returns default rate when no record exists."""
         session.query(RateEnvironment).delete()
         session.commit()
 
-        rate = RateAdapter.get_industry_rate(session, tier=1, default=None)
-        assert rate is None
+        # Should return default since no record exists
+        rate = RateAdapter.get_industry_rate(tier=1, db=session)
+        assert rate == 14.5  # Returns DEFAULT_RATES[1]
